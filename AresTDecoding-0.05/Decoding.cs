@@ -1,4 +1,4 @@
-﻿global using AresGlobalMethods;
+﻿global using AresGlobalMethods005;
 global using Corlib.NStar;
 global using System;
 global using System.Runtime.InteropServices;
@@ -7,15 +7,17 @@ global using System.Threading;
 global using System.Threading.Tasks;
 global using UnsafeFunctions;
 global using G = System.Collections.Generic;
-global using static AresGlobalMethods.Decoding;
+global using static AresGlobalMethods005.Decoding;
 global using static Corlib.NStar.Extents;
 global using static System.Math;
 global using static UnsafeFunctions.Global;
 
-namespace AresTLib;
+namespace AresTLib005;
 
 public static class Decoding
 {
+	internal const byte ProgramVersion = 1;
+
 	public static byte[] Decode(byte[] compressedFile, byte encodingVersion)
 	{
 		if (compressedFile.Length <= 2)
@@ -24,7 +26,10 @@ public static class Decoding
 			return compressedFile;
 		else if (encodingVersion < ProgramVersion)
 		{
-			//return Outdated.Decode(encodingVersion, compressedFile);
+			return encodingVersion switch
+			{
+				_ => throw new DecoderFallbackException(),
+			};
 		}
 		int method = compressedFile[0];
 		if (method == 0)

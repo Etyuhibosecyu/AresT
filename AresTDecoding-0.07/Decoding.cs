@@ -24,7 +24,11 @@ public static class Decoding
 			return compressedFile;
 		else if (encodingVersion < ProgramVersion)
 		{
-			//return Outdated.Decode(encodingVersion, compressedFile);
+			return encodingVersion switch
+			{
+				1 => AresTLib005.Decoding.Decode(compressedFile, encodingVersion),
+				_ => throw new DecoderFallbackException(),
+			};
 		}
 		int method = compressedFile[0];
 		if (method == 0)

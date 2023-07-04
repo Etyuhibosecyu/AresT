@@ -26,6 +26,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AresGlobalDecoding-0.05", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AresTDecoding-0.05", "AresTDecoding-0.05\AresTDecoding-0.05.csproj", "{68B18838-7DC0-4D06-97E9-946FCF416068}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AresGlobalDecoding-0.07", "..\AresGlobal\AresGlobalDecoding-0.07\AresGlobalDecoding-0.07.csproj", "{16595DBA-B967-4799-87C9-987B44630530}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AresTDecoding-0.07", "AresTDecoding-0.07\AresTDecoding-0.07.csproj", "{A1C1CEA7-1807-4168-A54C-6E6590171BD6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -70,6 +74,14 @@ Global
 		{68B18838-7DC0-4D06-97E9-946FCF416068}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{68B18838-7DC0-4D06-97E9-946FCF416068}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{68B18838-7DC0-4D06-97E9-946FCF416068}.Release|Any CPU.Build.0 = Release|Any CPU
+		{16595DBA-B967-4799-87C9-987B44630530}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{16595DBA-B967-4799-87C9-987B44630530}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{16595DBA-B967-4799-87C9-987B44630530}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{16595DBA-B967-4799-87C9-987B44630530}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1C1CEA7-1807-4168-A54C-6E6590171BD6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1C1CEA7-1807-4168-A54C-6E6590171BD6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1C1CEA7-1807-4168-A54C-6E6590171BD6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1C1CEA7-1807-4168-A54C-6E6590171BD6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -16,6 +16,7 @@ public partial class MainPage : ContentPage
 		Opening,
 		Compression,
 		Unpacking,
+		Recompression,
 	};
 
 	private Thread thread = new(() => { });
@@ -264,10 +265,10 @@ public partial class MainPage : ContentPage
 					process.WaitForExit();
 					File.Delete(path);
 				}
-				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Файл успешно " + (operation_type == OperationType.Compression ? "сжат" : "распакован") + timeString + "!", "ОК"));
+				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Файл успешно " + (operation_type is OperationType.Compression or OperationType.Recompression ? "сжат" : "распакован") + timeString + "!", "ОК"));
 			}
 			else if (message[0] == 2)
-				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Не удалось " + (operation_type == OperationType.Compression ? "сжать" : "распаковать") + " файл.", "ОК"));
+				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Не удалось " + (operation_type is OperationType.Compression or OperationType.Recompression ? "сжать" : "распаковать") + " файл.", "ОК"));
 			else if (message[0] == 3)
 				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Файл сжат, но распаковка не удалась.", "ОК"));
 			if (message[0] is not 0)
@@ -286,8 +287,9 @@ public partial class MainPage : ContentPage
 
 	private async void Thread(bool startImmediate)
 	{
-		if (operation_type == OperationType.Opening)
+		switch (operation_type)
 		{
+			case OperationType.Opening:
 			if (!startImmediate && ProcessStartup(".ares-t").Result is bool)
 				return;
 			try
@@ -307,9 +309,8 @@ public partial class MainPage : ContentPage
 			{
 				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Не удалось распаковать файл.", "ОК"));
 			}
-		}
-		else if (operation_type == OperationType.Compression)
-		{
+			break;
+			case OperationType.Compression:
 			if (ProcessStartup("").Result is bool)
 				return;
 			try
@@ -327,9 +328,8 @@ public partial class MainPage : ContentPage
 			{
 				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Не удалось сжать файл.", "ОК"));
 			}
-		}
-		else if (operation_type == OperationType.Unpacking)
-		{
+			break;
+			case OperationType.Unpacking:
 			if (ProcessStartup(".ares-t").Result is bool)
 				return;
 			try
@@ -347,6 +347,26 @@ public partial class MainPage : ContentPage
 			{
 				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Не удалось распаковать файл.", "ОК"));
 			}
+			break;
+			case OperationType.Recompression:
+			if (ProcessStartup(".ares-t").Result is bool)
+				return;
+			try
+			{
+				is_working = true;
+				SendMessageToClient(0, Encoding.UTF8.GetBytes(filename).Prepend((byte)4).ToArray());
+#if !DEBUG
+				compressionStart = DateTime.Now;
+#endif
+			}
+			catch (OperationCanceledException)
+			{
+			}
+			catch
+			{
+				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Не удалось сжать файл.", "ОК"));
+			}
+			break;
 		}
 	}
 
@@ -442,6 +462,14 @@ public partial class MainPage : ContentPage
 	{
 		operation_type = OperationType.Unpacking;
 		thread = new Thread(new ThreadStart(Thread)) { Name = "Поток распаковки" };
+		thread.Start();
+		thread.IsBackground = true;
+	}
+
+	private void ButtonOpenForRecompression_Click(object? sender, EventArgs e)
+	{
+		operation_type = OperationType.Recompression;
+		thread = new Thread(new ThreadStart(Thread)) { Name = "Поток пересжатия" };
 		thread.Start();
 		thread.IsBackground = true;
 	}

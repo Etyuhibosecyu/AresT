@@ -121,8 +121,9 @@ public static class MainClass
 				{
 					1 => () => MainThread(filename, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\" + Path.GetFileNameWithoutExtension(filename), Decompress),
 					2 => () => MainThread(filename, filename + ".ares-t", Compress),
-					_ => () => MainThread(filename, Path.GetDirectoryName(filename) + @"\" + Path.GetFileNameWithoutExtension(filename), Decompress)
-					,
+					3 => () => MainThread(filename, Path.GetDirectoryName(filename) + @"\" + Path.GetFileNameWithoutExtension(filename), Decompress),
+					4 => () => MainThread(filename, filename, Recompress),
+					_ => throw new NotImplementedException(),
 				})
 				{ Name = "Основной процесс" };
 				thread.Start();
@@ -367,6 +368,98 @@ public static class MainClass
 			wfs.Write(s, 0, s.Length);
 			Supertotal += ProgressBarStep;
 			GC.Collect();
+		}
+	}
+
+	private static void Recompress(FileStream rfs, FileStream wfs)
+	{
+		var readByte = (byte)rfs.ReadByte();
+		var encodingVersion = (byte)(readByte & 63);
+		if (encodingVersion >= ProgramVersion)
+			wfs.WriteByte(readByte);
+		if (encodingVersion is 0 or >= ProgramVersion)
+		{
+			var bytes2 = rfs.Length < FragmentLength ? default! : new byte[FragmentLength];
+			for (var i = 1; i < rfs.Length; i += FragmentLength)
+			{
+				var length = (int)Min(rfs.Length - i, FragmentLength);
+				if (length < FragmentLength)
+					bytes2 = new byte[length];
+				rfs.Read(bytes2, 0, length);
+				wfs.Write(bytes2, 0, length);
+			}
+			wfs.SetLength(wfs.Position);
+			return;
+		}
+		if (continue_)
+		{
+			fragmentCount = 0;
+			BitList bits;
+			bool one = false, success = false;
+			var sequencePos = 0;
+			while (1 == 1)
+			{
+				if (sequencePos >= 2)
+					readByte = (byte)rfs.ReadByte();
+				wfs.WriteByte(sequencePos >= 2 ? readByte : (byte)(readByte & 192 | ProgramVersion & 63));
+				bits = sequencePos >= 2 ? new(8, readByte) : new(2, (byte)(readByte >> 6));
+				for (var i = 0; i < bits.Length; i++)
+				{
+					if (bits[i] && one || sequencePos == FibonacciSequence.Length)
+					{
+						success = true;
+						break;
+					}
+					else
+					{
+						if (bits[i])
+							fragmentCount += FibonacciSequence[sequencePos];
+						sequencePos++;
+						one = bits[i];
+					}
+				}
+				if (success)
+					break;
+			}
+			SupertotalMaximum = fragmentCount * 10;
+		}
+		byte[] bytes;
+		for (; fragmentCount > 0; fragmentCount--)
+		{
+			if (fragmentCount == 1)
+			{
+				bytes = new byte[Min(rfs.Length - rfs.Position, FragmentLength + 2)];
+				rfs.Read(bytes, 0, bytes.Length);
+			}
+			else
+			{
+				bytes = new byte[3];
+				rfs.Read(bytes, 0, 3);
+				var fragmentLength = Min(bytes[0] * ValuesIn2Bytes + bytes[1] * ValuesInByte + bytes[2], FragmentLength + 2);
+				bytes = new byte[fragmentLength];
+				rfs.Read(bytes, 0, bytes.Length);
+			}
+			var s = Executions.Encode(Decoding.Decode(bytes, encodingVersion));
+			if (fragmentCount != 1)
+				wfs.Write(new byte[]{ (byte)(s.Length >> (BitsPerByte << 1)), (byte)(s.Length >> BitsPerByte), (byte)s.Length }, 0, 3);
+			wfs.Write(s, 0, s.Length);
+			Supertotal += ProgressBarStep;
+			GC.Collect();
+		}
+		if (wfs.Position > rfs.Length)
+		{
+			wfs.Seek(0, SeekOrigin.Begin);
+			rfs.Seek(0, SeekOrigin.Begin);
+			var bytes2 = rfs.Length < FragmentLength ? default! : new byte[FragmentLength];
+			for (var i = 0; i < rfs.Length; i += FragmentLength)
+			{
+				var length = (int)Min(rfs.Length - i, FragmentLength);
+				if (length < FragmentLength)
+					bytes2 = new byte[length];
+				rfs.Read(bytes2, 0, length);
+				wfs.Write(bytes2, 0, length);
+			}
+			wfs.SetLength(wfs.Position);
 		}
 	}
 }

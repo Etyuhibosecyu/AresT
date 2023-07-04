@@ -137,9 +137,10 @@
 									<Button
 										x:Name="ButtonOpenForRecompression"
 										BackgroundColor="#A06040"
+										Clicked="ButtonOpenForRecompression_Click"
 										Grid.Column="1"
 										Grid.Row="1"
-										Text="Открыть для пересжатия (в разработке)"
+										Text="Открыть для пересжатия"
 										FontSize="12" />
 									<Button
 										x:Name="ButtonStop"
