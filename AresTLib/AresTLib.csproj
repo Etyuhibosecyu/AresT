@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="MainClass.cs~RF191699ab.TMP" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\AresGlobal\AresGlobalMethods\AresGlobalMethods.csproj" />
+    <ProjectReference Include="..\AresTDecoding-0.05\AresTDecoding-0.05.csproj" />
+  </ItemGroup>
+
+</Project>
