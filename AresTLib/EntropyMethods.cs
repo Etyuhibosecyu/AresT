@@ -13,7 +13,7 @@ internal partial class Compression
 		var s = AdaptEncoding(out var encoding, out var nulls);
 		if (s == "")
 			throw new EncoderFallbackException();
-		Encoding encoding2 = (encoding == 1) ? Encoding.Unicode : (encoding == 2) ? Encoding.UTF8 : Encoding.GetEncoding(1251);
+		var encoding2 = (encoding == 1) ? Encoding.Unicode : (encoding == 2) ? Encoding.UTF8 : Encoding.GetEncoding(1251);
 		Current[tn] += ProgressBarStep;
 		if (shet)
 			s = SHET(s, ('\x99', '\x7F'));
@@ -24,7 +24,7 @@ internal partial class Compression
 		Current[tn] += ProgressBarStep;
 		Status[tn] = 0;
 		StatusMaximum[tn] = 10;
-		List<Word> wordsWithoutSpaces = words.PConvert(x => new Word(x.String, false));
+		var wordsWithoutSpaces = words.PConvert(x => new Word(x.String, false));
 		Status[tn]++;
 		var uniqueWords = wordsWithoutSpaces.ToHashSet().ToArray();
 		if (words.Length < uniqueWords.Length * 3)
@@ -58,9 +58,10 @@ internal partial class Compression
 			nullIntervals.WriteCount((uint)(nulls[i] - CreateVar(i == 0 ? 0 : nulls[i - 1] + 1, out var prev)), (uint)BitsCount(FragmentLength));
 		Status[tn]++;
 		result[0].Insert(0, CreateVar(nullIntervals.SplitIntoEqual(8).Convert(x => new ShortIntervalList(x)), out var splitNullIntervals));
-		result[0].Insert(0, new List<ShortIntervalList>() { new() { new(0, LengthsApplied, LengthsApplied), new(0, (uint)splitNullIntervals.Length + 1, (uint)splitNullIntervals.Length + 1) }, new(c) });
+		result[0].Insert(0, new List<ShortIntervalList>() { new() { LengthsApplied, new(0, (uint)splitNullIntervals.Length + 1, (uint)splitNullIntervals.Length + 1) }, new(c) });
+		input[0].ForEach(x => result[0][0].Add(x));
 		result[1].Insert(0, new ShortIntervalList());
-		result[2].Insert(0, new ShortIntervalList() { new(0, WordsApplied, WordsApplied), new(0, SpacesApplied, SpacesApplied) });
+		result[2].Insert(0, new ShortIntervalList() { WordsApplied, SpacesApplied });
 #if DEBUG
 		if (!RedStarLinq.Equals(originalFile.Filter((x, index) => !nulls.Contains(index) && (encoding == 0 || !nulls.Contains(index - 1))).ToArray(), result.Wrap(tl =>
 		{
@@ -281,17 +282,17 @@ internal partial class Compression
 
 	private bool AdaptiveHuffmanInternal(ArithmeticEncoder ar, List<ShortIntervalList> input, int n = 1)
 	{
-		var bwtIndex = input[0].IndexOf(new(0, BWTApplied, BWTApplied));
-		if (CreateVar(input[0].IndexOf(new(0, HuffmanApplied, HuffmanApplied)), out var huffmanIndex) != -1 && !(bwtIndex != -1 && huffmanIndex == bwtIndex + 1))
+		var bwtIndex = input[0].IndexOf(BWTApplied);
+		if (CreateVar(input[0].IndexOf(HuffmanApplied), out var huffmanIndex) != -1 && !(bwtIndex != -1 && huffmanIndex == bwtIndex + 1))
 			throw new EncoderFallbackException();
 		Current[tn] = 0;
 		CurrentMaximum[tn] = ProgressBarStep * 2;
 		Status[tn] = 0;
 		StatusMaximum[tn] = 3;
-		var lz = CreateVar(input[0].IndexOf(new(0, LempelZivApplied, LempelZivApplied)), out var lzIndex) != -1 && (bwtIndex == -1 || lzIndex != bwtIndex + 1);
-		var lzDummy = CreateVar(input[0].IndexOf(new(0, LempelZivDummyApplied, LempelZivDummyApplied)), out var lzDummyIndex) != -1 && (bwtIndex == -1 || lzDummyIndex != bwtIndex + 1);
+		var lz = CreateVar(input[0].IndexOf(LempelZivApplied), out var lzIndex) != -1 && (bwtIndex == -1 || lzIndex != bwtIndex + 1);
+		var lzDummy = CreateVar(input[0].IndexOf(LempelZivDummyApplied), out var lzDummyIndex) != -1 && (bwtIndex == -1 || lzDummyIndex != bwtIndex + 1);
 		var bwtLength = bwtIndex != -1 ? (int)input[0][bwtIndex + 1].Base : 0;
-		var startPos = (lz || lzDummy ? (input[0].Length >= lzIndex + 2 && input[0][lzIndex + 1] == new Interval(0, LempelZivSubdivided, LempelZivSubdivided) ? 3 : 2) : 1) + (input[0].Length >= 1 && input[0][0] == new Interval(0, LengthsApplied, LengthsApplied) ? (int)input[0][1].Base : 0) + bwtLength;
+		var startPos = (lz || lzDummy ? (input[0].Length >= lzIndex + 2 && input[0][lzIndex + 1] == LempelZivSubdivided ? 3 : 2) : 1) + (input[0].Length >= 1 && input[0][0] == LengthsApplied ? (int)input[0][1].Base : 0) + bwtLength;
 		Status[tn]++;
 		var lzPos = bwtIndex != -1 ? 4 : 2;
 		if (input.Length < startPos + lzPos + 1)
@@ -301,10 +302,10 @@ internal partial class Compression
 			throw new EncoderFallbackException();
 		Status[tn]++;
 		ar.WriteCount((uint)input.Length);
-		for (var i = 1; i < startPos; i++)
+		for (var i = 0; i < startPos; i++)
 			for (var j = 0; j < input[i].Length; j++)
 			{
-				Interval x = input[i][j];
+				var x = input[i][j];
 				if (i == startPos - bwtLength && j == 2)
 					ar.WriteCount(x.Base);
 				ar.WritePart(x.Lower, x.Length, x.Base);
@@ -351,7 +352,7 @@ internal partial class Compression
 		for (var i = 0; i < startPos; i++)
 			for (var j = 0; j < input[i].Length; j++)
 			{
-				Interval x = input[i][j];
+				var x = input[i][j];
 				ar.WritePart(x.Lower, x.Length, x.Base);
 			}
 		Status[tn]++;
@@ -388,7 +389,7 @@ internal partial class Compression
 
 	private BitList ArchaicHuffman(List<ShortIntervalList> input)
 	{
-		if (!(input.Length >= (CreateVar(input[0].Length >= 1 && input[0][0] == new Interval(0, LengthsApplied, LengthsApplied), out var lengths) ? 4 : 3) && input.AsSpan(CreateVar(lengths ? (int)input[0][1].Base + 1 : 1, out var startPos)).All(x => x.Length >= 1 && x.All(y => y.Length == 1)) && input.AsSpan(startPos + 1).All(x => x[0].Base == input[startPos][0].Base)))
+		if (!(input.Length >= (CreateVar(input[0].Length >= 1 && input[0][0] == LengthsApplied, out var lengths) ? 4 : 3) && input.AsSpan(CreateVar(lengths ? (int)input[0][1].Base + 1 : 1, out var startPos)).All(x => x.Length >= 1 && x.All(y => y.Length == 1)) && input.AsSpan(startPos + 1).All(x => x[0].Base == input[startPos][0].Base)))
 			throw new EncoderFallbackException();
 		var frequencyTable = input.AsSpan(startPos).FrequencyTable(x => x[0].Lower).NSort(x => ~(uint)x.Count);
 		var nodes = frequencyTable.Convert(x => new ArchaicHuffmanNode(x.Key, x.Count));
@@ -469,10 +470,12 @@ internal partial class Compression
 
 	private bool PPMInternal(ArithmeticEncoder ar, List<ShortIntervalList> input, int n = 1)
 	{
-		if (!(input.Length >= 4 && input[CreateVar(input[0].Length >= 1 && input[0][0] == new Interval(0, LengthsApplied, LengthsApplied) ? (int)input[0][1].Base + 1 : 1, out var startPos)].Length is 1 or 2 && input[startPos][0].Length == 1 && CreateVar(input[startPos][0].Base, out var inputBase) >= 2 && input[startPos][^1].Length == 1 && input.AsSpan(startPos + 1).All(x => x.Length == input[startPos].Length && x[0].Length == 1 && x[0].Base == inputBase && (x.Length == 1 || x[1].Length == 1 && x[1].Base == input[startPos][1].Base))))
+		if (!(input.Length >= 4 && input[CreateVar(input[0].Length >= 1 && input[0][0] == LengthsApplied ? (int)input[0][1].Base + 1 : 1, out var startPos)].Length is 1 or 2 && input[startPos][0].Length == 1 && CreateVar(input[startPos][0].Base, out var inputBase) >= 2 && input[startPos][^1].Length == 1 && input.AsSpan(startPos + 1).All(x => x.Length == input[startPos].Length && x[0].Length == 1 && x[0].Base == inputBase && (x.Length == 1 || x[1].Length == 1 && x[1].Base == input[startPos][1].Base))))
 			throw new EncoderFallbackException();
 		Status[tn] = 0;
 		StatusMaximum[tn] = input.Length - startPos;
+		for (var i = 0; i < input[0].Length; i++)
+			ar.WritePart(input[0][i].Lower, input[0][i].Length, input[0][i].Base);
 		if (n == 0)
 		{
 			ar.WritePart(input[1][0].Lower, 1, 3);

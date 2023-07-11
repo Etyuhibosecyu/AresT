@@ -418,7 +418,7 @@ public partial class MainPage : ContentPage
 
 	private async Task<int> SetOFDParsInternal(string Filter)
 	{
-		FileResult? fileResult = await MainThread.InvokeOnMainThreadAsync(async () => await FilePicker.Default.PickAsync(new() { PickerTitle = $"Select the *{Filter} file", FileTypes = new(new Dictionary<DevicePlatform, G.IEnumerable<string>>() { { DevicePlatform.Android, new[] { "multipart/mixed" } }, { DevicePlatform.MacCatalyst, new[] { "UTType.Item" } }, { DevicePlatform.WinUI, new[] { Filter } } }) }));
+		var fileResult = await MainThread.InvokeOnMainThreadAsync(async () => await FilePicker.Default.PickAsync(new() { PickerTitle = $"Select the *{Filter} file", FileTypes = new(new Dictionary<DevicePlatform, G.IEnumerable<string>>() { { DevicePlatform.Android, new[] { "multipart/mixed" } }, { DevicePlatform.MacCatalyst, new[] { "UTType.Item" } }, { DevicePlatform.WinUI, new[] { Filter } } }) }));
 		filename = fileResult?.FullPath ?? "";
 		if (filename == "" || !filename.EndsWith(Filter))
 			emptyFileName = true;

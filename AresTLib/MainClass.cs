@@ -109,11 +109,7 @@ public static class MainClass
 		try
 		{
 			if (message[0] == 0)
-			{
-				var value = BitConverter.ToInt32(message.AsSpan(1..));
-				PresentMethods = (UsedMethods)(value & ((1 << 24) - 1));
-				BWTThreads = (byte)(value >> 24);
-			}
+				PresentMethods = (UsedMethods)BitConverter.ToInt32(message.AsSpan(1..));
 			else if (message[0] <= 4)
 			{
 				var filename = Encoding.UTF8.GetString(message[1..]);

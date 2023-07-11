@@ -1,4 +1,5 @@
-﻿using Corlib.NStar;
+﻿using AresTLib;
+using Corlib.NStar;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -23,7 +24,7 @@ var filename = "";
 OperationType operation_type = default;
 var continue_ = false;
 var is_working = false;
-UsedMethods usedMethods = UsedMethods.CS1 | UsedMethods.HF1 | UsedMethods.LZ1 | UsedMethods.CS2 | UsedMethods.LZ2;
+var usedMethods = UsedMethods.CS1 | UsedMethods.HF1 | UsedMethods.LZ1 | UsedMethods.CS2 | UsedMethods.LZ2;
 #if !DEBUG
 DateTime compressionStart = default;
 #endif
@@ -441,7 +442,7 @@ while (true)
 			WriteLine("Некорректная команда! Введите Help, чтобы получить помощь.");
 			goto l1;
 		}
-		UsedMethods changingMethods = s[i][1..] switch
+		var changingMethods = s[i][1..] switch
 		{
 			"CS1" => UsedMethods.CS1,
 			"LZ1" => UsedMethods.LZ1,

@@ -17,6 +17,8 @@ namespace AresTLib005;
 public static class Decoding
 {
 	internal const byte ProgramVersion = 1;
+	internal const int FragmentLength = 8000000;
+	internal const int BWTBlockSize = 50000;
 
 	public static byte[] Decode(byte[] compressedFile, byte encodingVersion)
 	{
@@ -83,7 +85,7 @@ public static class Decoding
 	private static NList<byte> JoinWords(this List<List<ShortIntervalList>> input, ListHashSet<int> nulls) => input.Wrap(tl =>
 	{
 		var encoding = tl[0][^1][0].Lower;
-		Encoding encoding2 = (encoding == 1) ? Encoding.Unicode : (encoding == 2) ? Encoding.UTF8 : Encoding.GetEncoding(1251);
+		var encoding2 = (encoding == 1) ? Encoding.Unicode : (encoding == 2) ? Encoding.UTF8 : Encoding.GetEncoding(1251);
 		var a = 0;
 		var wordsList = tl[0].AsSpan(..^1).Convert(l => encoding2.GetString(tl[1][a..(a += (int)l[0].Lower)].ToArray(x => (byte)x[0].Lower)));
 		var result = encoding2.GetBytes(tl[2].ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => l[1].Lower == 1 ? new List<char>(x).Add(' ') : x)).ToArray()).ToNList();
@@ -576,7 +578,7 @@ public static class Decoding
 		}
 		var sorted = indexCodes.ToArray((elem, index) => (elem, index)).NSort(x => (uint)x.elem);
 		var convert = sorted.ToArray(x => x.index);
-		List<ShortIntervalList> result = RedStarLinq.EmptyList<ShortIntervalList>(indexCodes.Length);
+		var result = RedStarLinq.EmptyList<ShortIntervalList>(indexCodes.Length);
 		var it = firstPermutation;
 		for (var i = 0; i < indexCodes.Length; i++)
 		{

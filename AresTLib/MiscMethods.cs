@@ -18,7 +18,7 @@ internal partial class Compression
 		this.tn = tn;
 	}
 
-	internal List<ShortIntervalList> PreEncode(ref int rle)
+	internal List<ShortIntervalList> PreEncode(ref int rle, out byte[] originalFile2)
 	{
 		List<ShortIntervalList> cdl;
 		byte[] string1, string2, cstring;
@@ -42,9 +42,13 @@ internal partial class Compression
 			rle = 14;
 			cstring = string2;
 		}
-		cdl = new ShortIntervalList[cstring.Length + 1];
-		cdl[0] = new();
-		Parallel.For(0, cstring.Length, i => cdl[i + 1] = ByteIntervals[cstring[i]]);
+		(originalFile2, var repeatsCount) = Repeats(cstring);
+		cdl = new ShortIntervalList[originalFile2.Length + 1];
+		cdl[0] = new() { repeatsCount == 1 ? RepeatsNotApplied : RepeatsApplied };
+		if (repeatsCount > 1)
+			cdl[0].WriteCount((uint)repeatsCount - 2);
+		var originalFile2_ = originalFile2;
+		Parallel.For(0, originalFile2.Length, i => cdl[i + 1] = ByteIntervals[originalFile2_[i]]);
 		Subtotal[tn] += ProgressBarStep;
 		return cdl;
 	}
@@ -272,7 +276,7 @@ internal partial class Compression
 		byte[] s;
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 2;
-		List<List<ShortIntervalList>> ctl = MakeWordsSplit((PresentMethods & UsedMethods.SHET2) != 0);
+		var ctl = MakeWordsSplit((PresentMethods & UsedMethods.SHET2) != 0);
 		if (ctl.Length == 0)
 			throw new EncoderFallbackException();
 		Subtotal[tn] += ProgressBarStep;
@@ -285,23 +289,39 @@ internal partial class Compression
 		}
 	}
 
+	public static (byte[] RepeatingBytes, int RepeatsCount) Repeats(byte[] input)
+	{
+		if (input.Length <= 2)
+			return (input, 1);
+		var findIndex = 1;
+		while ((findIndex = Array.IndexOf(input, input[0], findIndex + 1)) >= 0 && findIndex < input.Length >> 1)
+		{
+			var (quotient, remainder) = DivRem(input.Length, findIndex);
+			if (remainder != 0)
+				continue;
+			if (new Chain(quotient - 1).All(x => RedStarLinq.Equals(input.AsSpan(0, findIndex), input.AsSpan(findIndex * (x + 1), findIndex))))
+				return (input.AsSpan(0, findIndex).ToArray(), quotient);
+		}
+		return (input, 1);
+	}
+
 	public List<ShortIntervalList> BWT(List<ShortIntervalList> input, bool words = false)
 	{
 		if (input.Length == 0)
 			throw new EncoderFallbackException();
-		if (input[0].Contains(new(0, HuffmanApplied, HuffmanApplied)) || input[0].Contains(new(0, BWTApplied, BWTApplied)))
+		if (input[0].Contains(HuffmanApplied) || input[0].Contains(BWTApplied))
 			return input;
 		Current[tn] = 0;
 		CurrentMaximum[tn] = ProgressBarStep * 2;
-		var lz = CreateVar(input[0].IndexOf(new(0, LempelZivApplied, LempelZivApplied)), out var lzIndex) != -1;
-		var startPos = (lz ? (input[0].Length >= lzIndex + 2 && input[0][lzIndex + 1] == new Interval(0, LempelZivSubdivided, LempelZivSubdivided) ? 3 : 2) : 1) + (input[0].Length >= 1 && input[0][0] == new Interval(0, LengthsApplied, LengthsApplied) ? (int)input[0][1].Base : 0);
+		var lz = CreateVar(input[0].IndexOf(LempelZivApplied), out var lzIndex) != -1;
+		var startPos = (lz ? (input[0].Length >= lzIndex + 2 && input[0][lzIndex + 1] == LempelZivSubdivided ? 3 : 2) : 1) + (input[0].Length >= 1 && input[0][0] == LengthsApplied ? (int)input[0][1].Base : 0);
 		if (input.Length < startPos + 2)
 			throw new EncoderFallbackException();
 		result.Replace(RedStarLinq.EmptyList<ShortIntervalList>(input.Length + GetArrayLength(input.Length - startPos, BWTBlockSize) * 2));
 		for (var i =  0; i < startPos; i++)
 			result[i] = input[i];
 		result[0] = new(result[0]);
-		var spaces = input[0].Length >= 2 && input[0][1] == new Interval(0, SpacesApplied, SpacesApplied);
+		var spaces = input[0].Length >= 2 && input[0][1] == SpacesApplied;
 		var innerCount = spaces ? 2 : 1;
 		Status[tn] = 0;
 		StatusMaximum[tn] = 7;
@@ -327,12 +347,12 @@ internal partial class Compression
 			BWTInternal<byte>();
 		else
 			BWTInternal<int>();
-		result[0].Add(new(0, BWTApplied, BWTApplied));
+		result[0].Add(BWTApplied);
 		if (intervalsBase == ValuesInByte)
 		{
 			var hs = uniqueElems.ToHashSet();
 			hs.ExceptWith(result.AsSpan(startPos).Convert(x => x[0].Lower));
-			List<Interval> c = hs.PConvert(x => new Interval(x, intervalsBase));
+			var c = hs.PConvert(x => new Interval(x, intervalsBase));
 			c.Insert(0, GetCountList((uint)hs.Length));
 			var cSplit = c.SplitIntoEqual(8);
 			c.Dispose();
@@ -402,7 +422,7 @@ internal partial class Compression
 				var bufferBase = GetBaseWithBuffer(intervalsBase);
 				for (var i = 0; i < currentBlock[blockIndex % buffer.Length].Length; i++)
 				{
-					T elem = currentBlock[blockIndex % buffer.Length][i];
+					var elem = currentBlock[blockIndex % buffer.Length][i];
 					var index = Array.IndexOf(MTFMemory[blockIndex % buffer.Length]!, elem);
 					result[startPos + (BWTBlockSize + 2) * blockIndex + i + 2] = new() { new(uniqueElems[index], inputPos < startPos + 2 ? intervalsBase : bufferBase) };
 					input[startPos + BWTBlockSize * blockIndex + i].AsSpan(1).ForEach(x => result[^1].Add(x));
@@ -686,7 +706,7 @@ internal partial class Compression
 		{
 			if (!elementsReplaced[i] && (i == this.result.Length - 1 || !elementsReplaced[i + 1]))
 			{
-				Interval first = this.result[i][0];
+				var first = this.result[i][0];
 				var newBase = GetBaseWithBuffer(first.Base);
 				this.result[i] = newBase == 269 ? ByteIntervals2[(int)first.Lower] : new(this.result[i]) { [0] = new(first.Lower, first.Length, newBase) };
 			}
@@ -703,14 +723,14 @@ public static class Executions
 		Total = 0;
 		TotalMaximum = ProgressBarStep * 6;
 		int hf = 0, bwt = 0, rle = 0, lz = 0, misc = 0, hfP1 = 0, lzP1 = 0, hfP2 = 0, lzP2 = 0, hfP3 = 0, lzP3 = 0, hfP4 = 0, lzP4 = 0, miscP5 = 0, miscP6 = 0, miscP7 = 0;
-		var mainInput = new Compression(originalFile, new(), 0).PreEncode(ref rle);
+		var mainInput = new Compression(originalFile, new(), 0).PreEncode(ref rle, out var originalFile2);
 		Total += ProgressBarStep;
 		Threads[0] = new Thread(() =>
 		{
 			try
 			{
 				if ((PresentMethods & UsedMethods.CS1) != 0)
-					new Compression(originalFile, mainInput, 0).Encode1(ref s[0], ref hfP1, ref lzP1);
+					new Compression(originalFile2, mainInput, 0).Encode1(ref s[0], ref hfP1, ref lzP1);
 			}
 			catch
 			{
@@ -722,7 +742,7 @@ public static class Executions
 			try
 			{
 				if ((PresentMethods & UsedMethods.CS2) != 0 && rle == 0)
-					new Compression(originalFile, mainInput, 1).Encode2(ref s[1], ref hfP2, ref lzP2);
+					new Compression(originalFile2, mainInput, 1).Encode2(ref s[1], ref hfP2, ref lzP2);
 			}
 			catch
 			{
@@ -734,7 +754,7 @@ public static class Executions
 			try
 			{
 				if ((PresentMethods & UsedMethods.CS3) != 0)
-					new Compression(originalFile, mainInput, 2).Encode3(ref s[2], ref hfP3);
+					new Compression(originalFile2, mainInput, 2).Encode3(ref s[2], ref hfP3);
 			}
 			catch
 			{
@@ -746,7 +766,7 @@ public static class Executions
 			try
 			{
 				if ((PresentMethods & UsedMethods.CS4) != 0 && rle == 0)
-					new Compression(originalFile, mainInput, 3).Encode4(ref s[3], ref hfP4);
+					new Compression(originalFile2, mainInput, 3).Encode4(ref s[3], ref hfP4);
 			}
 			catch
 			{
@@ -758,7 +778,7 @@ public static class Executions
 			try
 			{
 				if ((PresentMethods & UsedMethods.CS5) != 0)
-					new Compression(originalFile, mainInput, 4).Encode5(ref s[4], ref miscP5);
+					new Compression(originalFile2, mainInput, 4).Encode5(ref s[4], ref miscP5);
 			}
 			catch
 			{
@@ -770,7 +790,7 @@ public static class Executions
 			try
 			{
 				if ((PresentMethods & UsedMethods.CS6) != 0)
-					new Compression(originalFile, mainInput, 5).Encode6(ref s[5], ref miscP6);
+					new Compression(originalFile2, mainInput, 5).Encode6(ref s[5], ref miscP6);
 			}
 			catch
 			{
@@ -782,7 +802,7 @@ public static class Executions
 			try
 			{
 				if ((PresentMethods & UsedMethods.CS7) != 0)
-					new Compression(originalFile, mainInput, 6).Encode7(ref s[6], ref miscP7);
+					new Compression(originalFile2, mainInput, 6).Encode7(ref s[6], ref miscP7);
 			}
 			catch
 			{
