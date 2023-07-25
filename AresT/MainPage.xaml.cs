@@ -493,90 +493,21 @@ public partial class MainPage : ContentPage
 	{
 		if (PickerQuickSetup == null)
 			return;
-		if (PickerQuickSetup.SelectedIndex == 0)
-		{
-			CheckBoxCS1.IsChecked = true;
-			CheckBoxLZ1.IsChecked = true;
-			CheckBoxHF1.IsChecked = true;
-			CheckBoxCS2.IsChecked = false;
-			CheckBoxLZ2.IsChecked = false;
-			CheckBoxSHET2.IsChecked = false;
-			CheckBoxCS3.IsChecked = false;
-			CheckBoxCS4.IsChecked = false;
-			CheckBoxSHET4.IsChecked = false;
-			CheckBoxCS5.IsChecked = false;
-			CheckBoxSHET7.IsChecked = false;
-		}
-		else if (PickerQuickSetup.SelectedIndex == 1)
-		{
-			CheckBoxCS1.IsChecked = true;
-			CheckBoxLZ1.IsChecked = true;
-			CheckBoxHF1.IsChecked = true;
-			CheckBoxCS2.IsChecked = true;
-			CheckBoxLZ2.IsChecked = true;
-			CheckBoxSHET2.IsChecked = false;
-			CheckBoxCS3.IsChecked = false;
-			CheckBoxCS4.IsChecked = false;
-			CheckBoxSHET4.IsChecked = false;
-			CheckBoxCS5.IsChecked = false;
-			CheckBoxSHET7.IsChecked = false;
-		}
-		else if (PickerQuickSetup.SelectedIndex == 2)
-		{
-			CheckBoxCS1.IsChecked = true;
-			CheckBoxLZ1.IsChecked = true;
-			CheckBoxHF1.IsChecked = true;
-			CheckBoxCS2.IsChecked = true;
-			CheckBoxLZ2.IsChecked = true;
-			CheckBoxSHET2.IsChecked = false;
-			CheckBoxCS3.IsChecked = true;
-			CheckBoxCS4.IsChecked = true;
-			CheckBoxSHET4.IsChecked = false;
-			CheckBoxCS5.IsChecked = false;
-			CheckBoxSHET7.IsChecked = false;
-		}
-		else if (PickerQuickSetup.SelectedIndex == 3)
-		{
-			CheckBoxCS1.IsChecked = true;
-			CheckBoxLZ1.IsChecked = true;
-			CheckBoxHF1.IsChecked = true;
-			CheckBoxCS2.IsChecked = true;
-			CheckBoxLZ2.IsChecked = true;
-			CheckBoxSHET2.IsChecked = false;
-			CheckBoxCS3.IsChecked = true;
-			CheckBoxCS4.IsChecked = true;
-			CheckBoxSHET4.IsChecked = false;
-			CheckBoxCS5.IsChecked = false;
-			CheckBoxSHET7.IsChecked = false;
-		}
-		else if (PickerQuickSetup.SelectedIndex == 4)
-		{
-			CheckBoxCS1.IsChecked = true;
-			CheckBoxLZ1.IsChecked = true;
-			CheckBoxHF1.IsChecked = true;
-			CheckBoxCS2.IsChecked = true;
-			CheckBoxLZ2.IsChecked = true;
-			CheckBoxSHET2.IsChecked = true;
-			CheckBoxCS3.IsChecked = true;
-			CheckBoxCS4.IsChecked = true;
-			CheckBoxSHET4.IsChecked = true;
-			CheckBoxCS5.IsChecked = true;
-			CheckBoxSHET7.IsChecked = true;
-		}
-		else
-		{
-			CheckBoxCS1.IsChecked = true;
-			CheckBoxLZ1.IsChecked = true;
-			CheckBoxHF1.IsChecked = true;
-			CheckBoxCS2.IsChecked = true;
-			CheckBoxLZ2.IsChecked = true;
-			CheckBoxSHET2.IsChecked = false;
-			CheckBoxCS3.IsChecked = false;
-			CheckBoxCS4.IsChecked = false;
-			CheckBoxSHET4.IsChecked = false;
-			CheckBoxCS5.IsChecked = false;
-			CheckBoxSHET7.IsChecked = false;
-		}
+		var selectedIndex = PickerQuickSetup.SelectedIndex;
+		CheckBoxCS1.IsChecked = selectedIndex >= 0;
+		CheckBoxLZ1.IsChecked = selectedIndex >= 0;
+		CheckBoxHF1.IsChecked = selectedIndex >= 0;
+		CheckBoxCS2.IsChecked = selectedIndex >= 1;
+		CheckBoxLZ2.IsChecked = selectedIndex >= 1;
+		CheckBoxSHET2.IsChecked = false;
+		CheckBoxCS3.IsChecked = selectedIndex >= 2;
+		CheckBoxCS4.IsChecked = selectedIndex >= 2;
+		CheckBoxSHET4.IsChecked = false;
+		CheckBoxCS5.IsChecked = false;
+		CheckBoxCS6.IsChecked = selectedIndex >= 4;
+		CheckBoxCS7.IsChecked = selectedIndex >= 4;
+		CheckBoxSHET7.IsChecked = false;
+		(selectedIndex >= 3 ? RadioButtonAHF : RadioButtonSHF).IsChecked = true;
 		SendUsedMethods();
 	}
 
@@ -686,7 +617,7 @@ public partial class MainPage : ContentPage
 
 	private void CheckBoxSHET7_CheckedChanged(object? sender, EventArgs e)
 	{
-		usedMethods ^= UsedMethods.SHET5;
+		usedMethods ^= UsedMethods.SHET7;
 		SendUsedMethods();
 	}
 

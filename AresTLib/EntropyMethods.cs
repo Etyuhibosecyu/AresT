@@ -257,30 +257,30 @@ internal partial class Compression
 		return outputWords.Filter(x => x.String != "" || x.Space);
 	}
 
-	private byte[] AdaptiveHuffman(List<ShortIntervalList> input)
+	private byte[] AdaptiveHuffman(List<ShortIntervalList> input, LZData lzData)
 	{
 		if (input.Length < 2)
 			throw new EncoderFallbackException();
 		using ArithmeticEncoder ar = new();
-		if (!AdaptiveHuffmanInternal(ar, input))
+		if (!AdaptiveHuffmanInternal(ar, input, lzData))
 			throw new EncoderFallbackException();
 		ar.WriteEqual(1234567890, 4294967295);
 		return ar;
 	}
 
-	private byte[] AdaptiveHuffman(List<List<ShortIntervalList>> input)
+	private byte[] AdaptiveHuffman(List<List<ShortIntervalList>> input, LZData[] lzData)
 	{
 		if (input.Any(x => x.Length < 2))
 			throw new EncoderFallbackException();
 		using ArithmeticEncoder ar = new();
 		for (var i = 0; i < input.Length; i++)
-			if (!AdaptiveHuffmanInternal(ar, input[i], i))
+			if (!AdaptiveHuffmanInternal(ar, input[i], lzData[i], i))
 				throw new EncoderFallbackException();
 		ar.WriteEqual(1234567890, 4294967295);
 		return ar;
 	}
 
-	private bool AdaptiveHuffmanInternal(ArithmeticEncoder ar, List<ShortIntervalList> input, int n = 1)
+	private bool AdaptiveHuffmanInternal(ArithmeticEncoder ar, List<ShortIntervalList> input, LZData lzData, int n = 1)
 	{
 		var bwtIndex = input[0].IndexOf(BWTApplied);
 		if (CreateVar(input[0].IndexOf(HuffmanApplied), out var huffmanIndex) != -1 && !(bwtIndex != -1 && huffmanIndex == bwtIndex + 1))
@@ -317,6 +317,8 @@ internal partial class Compression
 		StatusMaximum[tn] = input.Length - startPos;
 		Current[tn] += ProgressBarStep;
 		SumSet<uint> set = new();
+		SumList lengthsSL = lz ? new(RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2))) : new(), distsSL = lz ? new(RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1)) : new();
+		var firstIntervalDist = lz ? (lzData.Dist.R == 0 ? lzData.Dist.Max + 1 : lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max - lzData.Dist.Threshold + 2) + lzData.UseSpiralLengths : 0;
 		if (lz)
 			set.Add((newBase - 1, 1));
 		for (var i = startPos; i < input.Length; i++, Status[tn]++)
@@ -334,7 +336,39 @@ internal partial class Compression
 			else
 				ar.WritePart((uint)sum, (uint)frequency, fullBase);
 			set.Increase(item);
-			for (var j = 1; j < input[i].Length; j++)
+			int lzLength = 0, lzSpiralLength = 0;
+			var j = 1;
+			if (lz && item == newBase - 1)
+			{
+				item = input[i][j].Lower;
+				lzLength = (int)(item + (lzData.Length.R == 2 ? lzData.Length.Threshold : 0));
+				sum = lengthsSL.GetLeftValuesSum((int)item, out frequency);
+				ar.WritePart((uint)sum, (uint)frequency, (uint)lengthsSL.ValuesSum);
+				lengthsSL.Increase((int)item);
+				j++;
+				if (lzData.Length.R != 0 && item == lengthsSL.Length - 1)
+				{
+					ar.WritePart(input[i][j].Lower, input[i][j].Length, input[i][j].Base);
+					lzLength = (int)(lzData.Length.R == 2 ? input[i][j].Lower : input[i][j].Lower + lzData.Length.Threshold + 1);
+					j++;
+				}
+				item = input[i][j].Lower;
+				sum = distsSL.GetLeftValuesSum((int)item, out frequency);
+				ar.WritePart((uint)sum, (uint)frequency, (uint)distsSL.ValuesSum);
+				distsSL.Increase((int)item);
+				j++;
+				if (lzData.Dist.R != 0 && input[i][j - 1].Lower == input[i][j - 1].Base - 1)
+				{
+					ar.WritePart(input[i][j].Lower, input[i][j].Length, input[i][j].Base);
+					j++;
+				}
+				lzSpiralLength = lzData.UseSpiralLengths != 0 && input[i][j - 1].Lower == input[i][j - 1].Base - 1 ? lzData.SpiralLength.R == 0 ? (int)input[i][^1].Lower : (int)(input[i][^1].Lower + (lzData.SpiralLength.R == 2 != (input[i][^2].Lower == input[i][^2].Base - 1) ? lzData.SpiralLength.Threshold + 2 - lzData.SpiralLength.R : 0)) : 0;
+				if (lz && distsSL.Length < firstIntervalDist)
+					new Chain(Min((int)firstIntervalDist - distsSL.Length, (lzLength + 2) * (lzSpiralLength + 1))).ForEach(x => distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1));
+			}
+			else if (lz && distsSL.Length < firstIntervalDist)
+				distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1);
+			for (; j < input[i].Length; j++)
 				ar.WritePart(input[i][j].Lower, input[i][j].Length, input[i][j].Base);
 		}
 		return true;

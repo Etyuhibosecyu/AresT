@@ -36,10 +36,12 @@ public enum UsedMethods
 	CS5 = 1 << 15,
 	SHET5 = 1 << 16,
 	CS6 = 1 << 17,
-	CS7 = 1 << 18,
-	SHET7 = 1 << 19,
-	CS8 = 1 << 20,
-	AHF = 1 << 21,
+	//Dev6 = 1 << 18,
+	CS7 = 1 << 19,
+	//Dev7 = 1 << 20,
+	SHET7 = 1 << 21,
+	CS8 = 1 << 22,
+	AHF = 1 << 23,
 }
 
 public static class Global
@@ -305,6 +307,8 @@ public static class Decoding
 		Status[0] = 0;
 		StatusMaximum[0] = counter;
 		SumSet<uint> set = new() { (uint.MaxValue, 1) };
+		SumList lengthsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2))) : new(), distsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1)) : new();
+		var firstIntervalDist = lz != 0 ? (lzData.Dist.R == 0 ? lzData.Dist.Max + 1 : lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max - lzData.Dist.Threshold + 2) + lzData.UseSpiralLengths : 0;
 		List<Interval> uniqueList = new();
 		if (lz != 0)
 		{
@@ -331,39 +335,43 @@ public static class Decoding
 			{
 				result.Add(n == 2 ? new() { uniqueList[readIndex], new(ar.ReadEqual(2), 2) } : new() { uniqueList[readIndex] });
 				fullLength++;
+				if (lz != 0 && distsSL.Length < firstIntervalDist)
+					distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1);
 				continue;
 			}
 			result.Add(new() { uniqueList[^1] });
 			uint dist, length, spiralLength = 0;
+			readIndex = ar.ReadPart(lengthsSL);
+			lengthsSL.Increase(readIndex);
 			if (lzData.Length.R == 0)
-				length = ar.ReadEqual(lzData.Length.Max + 1);
+				length = (uint)readIndex;
 			else if (lzData.Length.R == 1)
 			{
-				length = ar.ReadEqual(lzData.Length.Threshold + 2);
+				length = (uint)readIndex;
 				if (length == lzData.Length.Threshold + 1)
 					length += ar.ReadEqual(lzData.Length.Max - lzData.Length.Threshold);
 			}
 			else
 			{
-				length = ar.ReadEqual(lzData.Length.Max - lzData.Length.Threshold + 2) + lzData.Length.Threshold;
+				length = (uint)readIndex + lzData.Length.Threshold;
 				if (length == lzData.Length.Max + 1)
 					length = ar.ReadEqual(lzData.Length.Threshold);
 			}
 			result[^1].Add(new(length, lzData.Length.Max + 1));
-			if (length > result.Length - 2)
-				throw new DecoderFallbackException();
 			var maxDist = Min(lzData.Dist.Max, (uint)(fullLength - length - 2));
+			readIndex = ar.ReadPart(distsSL);
+			distsSL.Increase(readIndex);
 			if (lzData.Dist.R == 0 || maxDist < lzData.Dist.Threshold)
-				dist = ar.ReadEqual(maxDist + lzData.UseSpiralLengths + 1);
+				dist = (uint)readIndex;
 			else if (lzData.Dist.R == 1)
 			{
-				dist = ar.ReadEqual(lzData.Dist.Threshold + 2);
+				dist = (uint)readIndex;
 				if (dist == lzData.Dist.Threshold + 1)
 					dist += ar.ReadEqual(maxDist - lzData.Dist.Threshold + lzData.UseSpiralLengths);
 			}
 			else
 			{
-				dist = ar.ReadEqual(maxDist - lzData.Dist.Threshold + 2) + lzData.Dist.Threshold;
+				dist = (uint)readIndex + lzData.Dist.Threshold;
 				if (dist == maxDist + 1)
 				{
 					dist = ar.ReadEqual(lzData.Dist.Threshold + lzData.UseSpiralLengths);
@@ -391,6 +399,8 @@ public static class Decoding
 				result[^1].Add(new(spiralLength, lzData.SpiralLength.Max + 1));
 			}
 			fullLength += (int)((length + 2) * (spiralLength + 1));
+			if (lz != 0 && distsSL.Length < firstIntervalDist)
+				new Chain((int)Min(firstIntervalDist - distsSL.Length, (length + 2) * (spiralLength + 1))).ForEach(x => distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1));
 		}
 		return DecodeLempelZiv(result, lz != 0, 0, 0, 0, 0, lzData.UseSpiralLengths, 0, 0, 0);
 	}

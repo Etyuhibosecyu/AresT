@@ -57,9 +57,10 @@ internal partial class Compression
 	{
 		byte[] s;
 		List<ShortIntervalList> dl1, cdl = input;
+		LZData lzData = new();
 		if ((PresentMethods & UsedMethods.LZ1) != 0)
 		{
-			dl1 = new(new LempelZiv(cdl, result, tn).Encode());
+			dl1 = new(new LempelZiv(cdl, result, tn).Encode(out lzData));
 			Subtotal[tn] += ProgressBarStep;
 			s = WorkUpDoubleList(dl1, tn);
 		}
@@ -80,7 +81,7 @@ internal partial class Compression
 		{
 			if ((PresentMethods & UsedMethods.AHF) != 0)
 			{
-				s = AdaptiveHuffman(cdl);
+				s = AdaptiveHuffman(cdl, lzData);
 				Subtotal[tn] += ProgressBarStep;
 			}
 			else
@@ -101,7 +102,7 @@ internal partial class Compression
 		}
 		if ((PresentMethods & UsedMethods.PSLZ1) != 0 && (PresentMethods & UsedMethods.LZ1) == 0)
 		{
-			dl1 = new(new LempelZiv(cdl, result, tn).Encode());
+			dl1 = new(new LempelZiv(cdl, result, tn).Encode(out _));
 			Subtotal[tn] += ProgressBarStep;
 			s = WorkUpDoubleList(dl1, tn);
 		}
@@ -119,6 +120,7 @@ internal partial class Compression
 	{
 		byte[] s, cs2 = cs;
 		List<List<ShortIntervalList>> tl1, ctl;
+		LZData[] lzData = { new(), new(), new() };
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 9;
 		ctl = MakeWordsSplit((PresentMethods & UsedMethods.SHET2) != 0);
@@ -131,7 +133,7 @@ internal partial class Compression
 			tl1 = RedStarLinq.Fill(ctl.Length, _ => new List<ShortIntervalList>());
 			for (var i = 0; i < ctl.Length; i++)
 			{
-				tl1[i] = new(new LempelZiv(ctl[i], result, tn).Encode());
+				tl1[i] = new(new LempelZiv(ctl[i], result, tn).Encode(out lzData[i]));
 				Subtotal[tn] += ProgressBarStep;
 			}
 			s = WorkUpTripleList(tl1, tn);
@@ -151,7 +153,7 @@ internal partial class Compression
 		}
 		if ((PresentMethods & UsedMethods.AHF) != 0)
 		{
-			s = AdaptiveHuffman(ctl);
+			s = AdaptiveHuffman(ctl, lzData);
 			Subtotal[tn] += ProgressBarStep;
 		}
 		else
@@ -184,7 +186,7 @@ internal partial class Compression
 		Subtotal[tn] += ProgressBarStep;
 		if ((PresentMethods & UsedMethods.AHF) != 0)
 		{
-			s = AdaptiveHuffman(dl1);
+			s = AdaptiveHuffman(dl1, new());
 			Subtotal[tn] += ProgressBarStep;
 		}
 		else
@@ -219,7 +221,7 @@ internal partial class Compression
 		Subtotal[tn] += ProgressBarStep;
 		if ((PresentMethods & UsedMethods.AHF) != 0)
 		{
-			s = AdaptiveHuffman(ctl);
+			s = AdaptiveHuffman(ctl, Array.Empty<LZData>());
 			Subtotal[tn] += ProgressBarStep;
 		}
 		else
@@ -276,7 +278,7 @@ internal partial class Compression
 		byte[] s;
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 2;
-		var ctl = MakeWordsSplit((PresentMethods & UsedMethods.SHET2) != 0);
+		var ctl = MakeWordsSplit((PresentMethods & UsedMethods.SHET7) != 0);
 		if (ctl.Length == 0)
 			throw new EncoderFallbackException();
 		Subtotal[tn] += ProgressBarStep;

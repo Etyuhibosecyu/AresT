@@ -312,7 +312,7 @@
 										Grid.Row="1"
 										Opacity="{Binding IsChecked, Converter={StaticResource OpacityConverter}, ConverterParameter={Binding IsChecked}, StringFormat='{0:X2}'}">
 										<Label
-											BackgroundColor="#FFBFDF"
+											BackgroundColor="#80BFFF"
 											ToolTipProperties.Text='LZMA - разновидность Лемпеля-Зива (LZ), применяемая к битам. Одно это уже делает алгоритм в корне отличающимся от "классического" Лемпеля-Зива и по степени сжатия, и по скорости, и по собственно алгоритму. Одно только название осталось от LZ...'
 											Text="  ✓     LZMA" />
 									</VerticalStackLayout>
@@ -368,7 +368,7 @@
 										Grid.Row="1"
 										Opacity="{Binding IsChecked, Converter={StaticResource OpacityConverter}, ConverterParameter={Binding IsChecked}, StringFormat='{0:X2}'}">
 										<Label
-											BackgroundColor="#FFBFDF"
+											BackgroundColor="#80BFFF"
 											ToolTipProperties.Text='PPM для бит (PPMB) - поражающий воображение алгоритм сжатия - работает с произвольными данными, сжимает так, что все другие и рядом не стояли, практически моментально восстанавливается после "встряски" резкой сменой типа контента... если вы готовы к скорости меньше 1 МБ/ч и затратам RAM x5000 от размера файла (для сжатия 8 МБ ее потребуется 40 ГБ)!'
 											Text="  ✓     PPMB" />
 									</VerticalStackLayout>
@@ -380,6 +380,7 @@
 										Grid.RowSpan="2">
 										<material:RadioButtonGroupView>
 											<material:RadioButton
+												x:Name="RadioButtonSHF"
 												ToolTipProperties.Text='Хаффман (Huff, HF) - алгоритм энтропийного сжатия, кодирующий частые элементы короткими кодами, а редкие - длинными. Для HF без специальных обозначений "элементами" являются байты, благодаря чему он быстрый и универсальный, и вместе с Лемпелем-Зивом является классикой в деле сжатия данных, но сжимает часто хуже, чем более специфические алгоритмы.'
 												IsChecked="True"
 												Text="SHF" />
