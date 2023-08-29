@@ -221,6 +221,13 @@ public static class MainClass
 	{
 		client?.Close();//отключение клиента
 		netStream?.Close();//отключение потока
+		var tempFilename = (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-" + Environment.ProcessId + ".tmp";
+		if (File.Exists(tempFilename))
+		{
+			rfs.Close();
+			wfs.Close();
+			File.Delete(tempFilename);
+		}
 		Environment.Exit(0); //завершение процесса
 	}
 

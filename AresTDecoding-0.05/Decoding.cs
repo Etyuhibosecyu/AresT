@@ -87,7 +87,7 @@ public static class Decoding
 		var encoding = tl[0][^1][0].Lower;
 		var encoding2 = (encoding == 1) ? Encoding.Unicode : (encoding == 2) ? Encoding.UTF8 : Encoding.GetEncoding(1251);
 		var a = 0;
-		var wordsList = tl[0].AsSpan(..^1).Convert(l => encoding2.GetString(tl[1][a..(a += (int)l[0].Lower)].ToArray(x => (byte)x[0].Lower)));
+		var wordsList = tl[0].GetSlice(..^1).Convert(l => encoding2.GetString(tl[1][a..(a += (int)l[0].Lower)].ToArray(x => (byte)x[0].Lower)));
 		var result = encoding2.GetBytes(tl[2].ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => l[1].Lower == 1 ? new List<char>(x).Add(' ') : x)).ToArray()).ToNList();
 		foreach (var x in nulls)
 			if (encoding == 0)
@@ -443,7 +443,7 @@ public static class Decoding
 		uint nextWordLink = 0;
 		for (; (int)counter > 0; counter--, Status[0]++)
 		{
-			var context = result.AsSpan(Max(result.Length - maxDepth, 0)..).NConvert(x => x[0].Lower).Reverse();
+			var context = result.GetSlice(Max(result.Length - maxDepth, 0)..).NConvert(x => x[0].Lower).Reverse();
 			var context2 = context.Copy();
 			var index = -1;
 			SumSet<uint>? set = null, excludingSet = new();
@@ -506,7 +506,7 @@ public static class Decoding
 			for (var i = 0; i < length + maxDepth - 1; i++)
 			{
 				result.Add(result[oldPos + i]);
-				Increase(result.AsSpan(result.Length - maxDepth - 1, maxDepth).NConvert(x => x[0].Lower).Reverse(), result[^1][0].Lower);
+				Increase(result.GetSlice(result.Length - maxDepth - 1, maxDepth).NConvert(x => x[0].Lower).Reverse(), result[^1][0].Lower);
 			}
 			preLZMap[1]++;
 			var decrease = length + maxDepth - 2;
@@ -560,12 +560,12 @@ public static class Decoding
 				throw new DecoderFallbackException();
 			var length = Min(BWTBlockSize, input.Length - i - 2);
 			var firstPermutation = (int)(input[i][0].Lower * input[i + 1][0].Base + input[i + 1][0].Lower);
-			result.AddRange(input.AsSpan(i + 2, length).DecodeBWT2(hs, firstPermutation));
+			result.AddRange(input.GetSlice(i + 2, length).DecodeBWT2(hs, firstPermutation));
 		}
 		return result;
 	}
 
-	private static List<ShortIntervalList> DecodeBWT2(this Span<ShortIntervalList> input, ListHashSet<int> hs, int firstPermutation)
+	private static List<ShortIntervalList> DecodeBWT2(this Slice<ShortIntervalList> input, ListHashSet<int> hs, int firstPermutation)
 	{
 		var indexCodes = input.Convert(x => (int)x[0].Lower);
 		var mtfMemory = hs.ToArray();
@@ -584,7 +584,7 @@ public static class Decoding
 		{
 			it = convert[it];
 			result[i] = new() { new((uint)indexCodes[it], input[i][0].Base) };
-			input[i].AsSpan(1).ForEach(x => result[i].Add(x));
+			input[i].GetSlice(1).ForEach(x => result[i].Add(x));
 		}
 		return result;
 	}

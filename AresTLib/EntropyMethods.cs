@@ -66,8 +66,8 @@ internal partial class Compression
 		if (!RedStarLinq.Equals(originalFile.Filter((x, index) => !nulls.Contains(index) && (encoding == 0 || !nulls.Contains(index - 1))).ToArray(), result.Wrap(tl =>
 		{
 			var a = 0;
-			var wordsList = tl[0].AsSpan(GetArrayLength(nullIntervals.Length, 8) + 2).Convert(l => encoding2.GetString(tl[1].AsSpan(1)[a..(a += (int)l[0].Lower)].ToArray(x => (byte)x[0].Lower)));
-			return encoding2.GetBytes(tl[2].AsSpan(1).ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => l[1].Lower == 1 ? new List<char>(x).Add(' ') : x.ToList())).ToArray());
+			var wordsList = tl[0].GetSlice(GetArrayLength(nullIntervals.Length, 8) + 2).Convert(l => encoding2.GetString(tl[1].GetSlice(1)[a..(a += (int)l[0].Lower)].ToArray(x => (byte)x[0].Lower)));
+			return encoding2.GetBytes(tl[2].GetSlice(1).ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => l[1].Lower == 1 ? new List<char>(x).Add(' ') : x.ToList())).ToArray());
 		})))
 			throw new InvalidOperationException();
 #endif
@@ -298,7 +298,7 @@ internal partial class Compression
 		if (input.Length < startPos + lzPos + 1)
 			throw new EncoderFallbackException();
 		var originalBase = input[startPos + lzPos][0].Base;
-		if (!input.AsSpan(startPos + lzPos + 1).All((x, index) => bwtIndex != -1 && (index + lzPos + 1) % (BWTBlockSize + 2) is 0 or 1 || x[0].Base == originalBase))
+		if (!input.GetSlice(startPos + lzPos + 1).All((x, index) => bwtIndex != -1 && (index + lzPos + 1) % (BWTBlockSize + 2) is 0 or 1 || x[0].Base == originalBase))
 			throw new EncoderFallbackException();
 		Status[tn]++;
 		ar.WriteCount((uint)input.Length);
@@ -318,7 +318,7 @@ internal partial class Compression
 		Current[tn] += ProgressBarStep;
 		SumSet<uint> set = new();
 		SumList lengthsSL = lz ? new(RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2))) : new(), distsSL = lz ? new(RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1)) : new();
-		var firstIntervalDist = lz ? (lzData.Dist.R == 0 ? lzData.Dist.Max + 1 : lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max - lzData.Dist.Threshold + 2) + lzData.UseSpiralLengths : 0;
+		var firstIntervalDist = lz ? (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
 		if (lz)
 			set.Add((newBase - 1, 1));
 		for (var i = startPos; i < input.Length; i++, Status[tn]++)
@@ -336,7 +336,7 @@ internal partial class Compression
 			else
 				ar.WritePart((uint)sum, (uint)frequency, fullBase);
 			set.Increase(item);
-			int lzLength = 0, lzSpiralLength = 0;
+			int lzLength = 0, lzDist = 0, lzSpiralLength = 0;
 			var j = 1;
 			if (lz && item == newBase - 1)
 			{
@@ -353,16 +353,22 @@ internal partial class Compression
 					j++;
 				}
 				item = input[i][j].Lower;
-				sum = distsSL.GetLeftValuesSum((int)item, out frequency);
+				lzDist = (int)(item + (lzData.Dist.R == 2 && distsSL.Length - lzData.UseSpiralLengths - lzLength - startPos >= lzData.Dist.Threshold ? lzData.Dist.Threshold : 0));
+				if (lzData.Dist.R == 2 && distsSL.Length - lzData.UseSpiralLengths - lzLength - startPos >= lzData.Dist.Threshold && lzDist == (distsSL.Length == firstIntervalDist ? lzData.Dist.Max : distsSL.Length - lzData.UseSpiralLengths - lzLength - startPos) + 1)
+				{
+					j++;
+					if (input[i][j].Lower != lzData.Dist.Threshold) lzDist = (int)input[i][j].Lower;
+				}
+				sum = distsSL.GetLeftValuesSum(lzDist, out frequency);
 				ar.WritePart((uint)sum, (uint)frequency, (uint)distsSL.ValuesSum);
-				distsSL.Increase((int)item);
+				distsSL.Increase(lzDist);
 				j++;
-				if (lzData.Dist.R != 0 && input[i][j - 1].Lower == input[i][j - 1].Base - 1)
+				if (lzData.Dist.R != 0 && input[i][j - 1].Base == firstIntervalDist - lzData.UseSpiralLengths && input[i][j - 1].Lower == input[i][j - 1].Base - 1)
 				{
 					ar.WritePart(input[i][j].Lower, input[i][j].Length, input[i][j].Base);
 					j++;
 				}
-				lzSpiralLength = lzData.UseSpiralLengths != 0 && input[i][j - 1].Lower == input[i][j - 1].Base - 1 ? lzData.SpiralLength.R == 0 ? (int)input[i][^1].Lower : (int)(input[i][^1].Lower + (lzData.SpiralLength.R == 2 != (input[i][^2].Lower == input[i][^2].Base - 1) ? lzData.SpiralLength.Threshold + 2 - lzData.SpiralLength.R : 0)) : 0;
+				lzSpiralLength = lzData.UseSpiralLengths != 0 && input[i][j - 1].Lower == input[i][j - 1].Base - 1 ? lzData.SpiralLength.R == 0 ? (int)input[i][^1].Lower : (int)(input[i][^1].Lower + (lzData.SpiralLength.R == 2 != (input[i][j].Lower == input[i][j].Base - 1) ? lzData.SpiralLength.Threshold + 2 - lzData.SpiralLength.R : 0)) : 0;
 				if (lz && distsSL.Length < firstIntervalDist)
 					new Chain(Min((int)firstIntervalDist - distsSL.Length, (lzLength + 2) * (lzSpiralLength + 1))).ForEach(x => distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1));
 			}
@@ -376,7 +382,7 @@ internal partial class Compression
 
 	private bool AdaptiveHuffmanBits(ArithmeticEncoder ar, List<ShortIntervalList> input, int startPos)
 	{
-		if (!(input.Length >= startPos + 2 && input.AsSpan(startPos).All(x => x.Length > 0 && x[0].Base == 2)))
+		if (!(input.Length >= startPos + 2 && input.GetSlice(startPos).All(x => x.Length > 0 && x[0].Base == 2)))
 			throw new EncoderFallbackException();
 		Status[tn] = 0;
 		StatusMaximum[tn] = 3;
@@ -423,9 +429,9 @@ internal partial class Compression
 
 	private BitList ArchaicHuffman(List<ShortIntervalList> input)
 	{
-		if (!(input.Length >= (CreateVar(input[0].Length >= 1 && input[0][0] == LengthsApplied, out var lengths) ? 4 : 3) && input.AsSpan(CreateVar(lengths ? (int)input[0][1].Base + 1 : 1, out var startPos)).All(x => x.Length >= 1 && x.All(y => y.Length == 1)) && input.AsSpan(startPos + 1).All(x => x[0].Base == input[startPos][0].Base)))
+		if (!(input.Length >= (CreateVar(input[0].Length >= 1 && input[0][0] == LengthsApplied, out var lengths) ? 4 : 3) && input.GetSlice(CreateVar(lengths ? (int)input[0][1].Base + 1 : 1, out var startPos)).All(x => x.Length >= 1 && x.All(y => y.Length == 1)) && input.GetSlice(startPos + 1).All(x => x[0].Base == input[startPos][0].Base)))
 			throw new EncoderFallbackException();
-		var frequencyTable = input.AsSpan(startPos).FrequencyTable(x => x[0].Lower).NSort(x => ~(uint)x.Count);
+		var frequencyTable = input.GetSlice(startPos).FrequencyTable(x => x[0].Lower).NSort(x => ~(uint)x.Count);
 		var nodes = frequencyTable.Convert(x => new ArchaicHuffmanNode(x.Key, x.Count));
 		var maxFrequency = nodes[0].Count;
 		Current[tn] = 0;
@@ -504,7 +510,7 @@ internal partial class Compression
 
 	private bool PPMInternal(ArithmeticEncoder ar, List<ShortIntervalList> input, int n = 1)
 	{
-		if (!(input.Length >= 4 && input[CreateVar(input[0].Length >= 1 && input[0][0] == LengthsApplied ? (int)input[0][1].Base + 1 : 1, out var startPos)].Length is 1 or 2 && input[startPos][0].Length == 1 && CreateVar(input[startPos][0].Base, out var inputBase) >= 2 && input[startPos][^1].Length == 1 && input.AsSpan(startPos + 1).All(x => x.Length == input[startPos].Length && x[0].Length == 1 && x[0].Base == inputBase && (x.Length == 1 || x[1].Length == 1 && x[1].Base == input[startPos][1].Base))))
+		if (!(input.Length >= 4 && input[CreateVar(input[0].Length >= 1 && input[0][0] == LengthsApplied ? (int)input[0][1].Base + 1 : 1, out var startPos)].Length is 1 or 2 && input[startPos][0].Length == 1 && CreateVar(input[startPos][0].Base, out var inputBase) >= 2 && input[startPos][^1].Length == 1 && input.GetSlice(startPos + 1).All(x => x.Length == input[startPos].Length && x[0].Length == 1 && x[0].Base == inputBase && (x.Length == 1 || x[1].Length == 1 && x[1].Base == input[startPos][1].Base))))
 			throw new EncoderFallbackException();
 		Status[tn] = 0;
 		StatusMaximum[tn] = input.Length - startPos;
@@ -527,6 +533,7 @@ internal partial class Compression
 		FastDelHashSet<NList<uint>> contextHS = new(comparer);
 		HashList<NList<uint>> lzhl = new(comparer);
 		List<SumSet<uint>> sumSets = new();
+		SumList lzLengthsSL = new() { 1 };
 		uint lzCount = 1, notLZCount = 1, spaceCount = 1, notSpaceCount = 1;
 		LimitedQueue<bool> spaceBuffer = new(maxDepth);
 		LimitedQueue<uint> newItemsBuffer = new(maxDepth);
@@ -534,7 +541,7 @@ internal partial class Compression
 		for (var i = startPos; i < input.Length; i++, Status[tn]++)
 		{
 			var item = input[i][0].Lower;
-			var context = input.AsSpan(Max(startPos, i - maxDepth)..i).NConvert(x => x[0].Lower).Reverse();
+			var context = input.GetSlice(Max(startPos, i - maxDepth)..i).NConvert(x => x[0].Lower).Reverse();
 			var context2 = context.Copy();
 			if (i < nextTarget)
 				goto l1;
@@ -630,7 +637,18 @@ internal partial class Compression
 			ar.WritePart(notLZCount, lzCount, lzCount + notLZCount);
 			lzCount++;
 			ar.WriteEqual((uint)(curPos - (bestDist + maxDepth + startPos) - 2), (uint)Min(curPos - startPos - maxDepth, LZDictionarySize - 1));
-			ar.WriteFibonacci((uint)bestLength + 1);
+			if (bestLength < lzLengthsSL.Length - 1)
+			{
+				ar.WritePart((uint)lzLengthsSL.GetLeftValuesSum(bestLength, out var frequency), (uint)frequency, (uint)lzLengthsSL.ValuesSum);
+				lzLengthsSL.Increase(bestLength);
+			}
+			else
+			{
+				ar.WritePart((uint)(lzLengthsSL.ValuesSum - lzLengthsSL[^1]), (uint)lzLengthsSL[^1], (uint)lzLengthsSL.ValuesSum);
+				lzLengthsSL.Increase(lzLengthsSL.Length - 1);
+				ar.WriteFibonacci((uint)(bestLength - lzLengthsSL.Length + 2));
+				new Chain(bestLength - lzLengthsSL.Length + 1).ForEach(x => lzLengthsSL.Insert(lzLengthsSL.Length - 1, 1));
+			}
 			buffer.Clear();
 			spaceBuffer.Clear();
 			if (n != 2)

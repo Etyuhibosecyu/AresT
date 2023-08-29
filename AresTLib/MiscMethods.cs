@@ -301,8 +301,8 @@ internal partial class Compression
 			var (quotient, remainder) = DivRem(input.Length, findIndex);
 			if (remainder != 0)
 				continue;
-			if (new Chain(quotient - 1).All(x => RedStarLinq.Equals(input.AsSpan(0, findIndex), input.AsSpan(findIndex * (x + 1), findIndex))))
-				return (input.AsSpan(0, findIndex).ToArray(), quotient);
+			if (new Chain(quotient - 1).All(x => RedStarLinq.Equals(input.GetSlice(0, findIndex), input.GetSlice(findIndex * (x + 1), findIndex))))
+				return (input.GetSlice(0, findIndex).ToArray(), quotient);
 		}
 		return (input, 1);
 	}
@@ -328,11 +328,11 @@ internal partial class Compression
 		Status[tn] = 0;
 		StatusMaximum[tn] = 7;
 		var maxFrequency = 1;
-		var groups = input.AsSpan(startPos).Convert((x, index) => (elem: x[0], index)).Wrap(l => lz ? l.FilterInPlace(x => x.index < 2 || x.elem.Lower + x.elem.Length != x.elem.Base) : l).Group(x => x.elem.Lower).Wrap(l => CreateVar(l.Max(x => x.Length), out maxFrequency) > input[startPos][0].Base * 2 || input[startPos][0].Base <= 256 ? l.NSort(x => 4294967295 - (uint)x.Length) : l);
+		var groups = input.GetSlice(startPos).Convert((x, index) => (elem: x[0], index)).Wrap(l => lz ? l.FilterInPlace(x => x.index < 2 || x.elem.Lower + x.elem.Length != x.elem.Base) : l).Group(x => x.elem.Lower).Wrap(l => CreateVar(l.Max(x => x.Length), out maxFrequency) > input[startPos][0].Base * 2 || input[startPos][0].Base <= 256 ? l.NSort(x => 4294967295 - (uint)x.Length) : l);
 		Status[tn]++;
 		var uniqueElems = groups.PConvert(x => x[0].elem.Lower);
 		Status[tn]++;
-		var indexCodes = input.AsSpan(startPos).Convert(x => (int)x[0].Lower);
+		var indexCodes = input.GetSlice(startPos).Convert(x => (int)x[0].Lower);
 		Status[tn]++;
 		NList<(int elem, int freq)> frequencyTable = groups.PNConvert((x, index) => (index, x.Length));
 		groups.Dispose();
@@ -353,7 +353,7 @@ internal partial class Compression
 		if (intervalsBase == ValuesInByte)
 		{
 			var hs = uniqueElems.ToHashSet();
-			hs.ExceptWith(result.AsSpan(startPos).Convert(x => x[0].Lower));
+			hs.ExceptWith(result.GetSlice(startPos).Convert(x => x[0].Lower));
 			var c = hs.PConvert(x => new Interval(x, intervalsBase));
 			c.Insert(0, GetCountList((uint)hs.Length));
 			var cSplit = c.SplitIntoEqual(8);
@@ -427,7 +427,7 @@ internal partial class Compression
 					var elem = currentBlock[blockIndex % buffer.Length][i];
 					var index = Array.IndexOf(MTFMemory[blockIndex % buffer.Length]!, elem);
 					result[startPos + (BWTBlockSize + 2) * blockIndex + i + 2] = new() { new(uniqueElems[index], inputPos < startPos + 2 ? intervalsBase : bufferBase) };
-					input[startPos + BWTBlockSize * blockIndex + i].AsSpan(1).ForEach(x => result[^1].Add(x));
+					input[startPos + BWTBlockSize * blockIndex + i].GetSlice(1).ForEach(x => result[^1].Add(x));
 					Array.Copy(MTFMemory[blockIndex % buffer.Length]!, 0, MTFMemory[blockIndex % buffer.Length]!, 1, index);
 					MTFMemory[blockIndex % buffer.Length][0] = elem;
 					Status[tn]++;
@@ -440,7 +440,7 @@ internal partial class Compression
 	{
 		Status[tn] = 0;
 		StatusMaximum[tn] = originalString.Length;
-		var pattern1 = @"(?<=[A-Za-zА-Яа-я])(" + string.Join('|', SHETEndinds.AsSpan(0, 3).ToArray(x => string.Join('|', x.Filter(x => x.Length > 2).SortDesc(x => x.Length).ToArray()))) + ")";
+		var pattern1 = @"(?<=[A-Za-zА-Яа-я])(" + string.Join('|', SHETEndinds.GetSlice(0, 3).ToArray(x => string.Join('|', x.Filter(x => x.Length > 2).SortDesc(x => x.Length).ToArray()))) + ")";
 		var pattern2 = @"(?<![A-Za-zА-Яа-я])(" + string.Join('|', SHETEndinds[3].Filter(x => x.Length > 2).SortDesc(x => x.Length).ToArray()) + ")";
 		return Regex.Replace(Regex.Replace(originalString.Replace("" + specialSymbols.Starter, "" + specialSymbols.Starter + specialSymbols.Escape), pattern1, x => GetSHETReplacer(x, specialSymbols, SHETDic1, SHETThreshold1)), pattern2, x => GetSHETReplacer(x, specialSymbols, SHETDic2, SHETThreshold2));
 	}
@@ -498,9 +498,9 @@ internal partial class Compression
 
 	private byte[] LZMA(List<ShortIntervalList> input)
 	{
-		if (!(input.Length >= 3 && CreateVar(input[1][0].Base, out var originalBase) <= ValuesInByte && input.AsSpan(2).All(x => x[0].Base == originalBase)))
+		if (!(input.Length >= 3 && CreateVar(input[1][0].Base, out var originalBase) <= ValuesInByte && input.GetSlice(2).All(x => x[0].Base == originalBase)))
 			throw new EncoderFallbackException();
-		using BitList bitList = new(input.AsSpan(1).NConvert(x => (byte)x[0].Lower));
+		using BitList bitList = new(input.GetSlice(1).NConvert(x => (byte)x[0].Lower));
 		return LZMA(bitList);
 	}
 
@@ -592,7 +592,7 @@ internal partial class Compression
 		{
 			if (level < maxLevel)
 			{
-				var nextCodes = ic.AsSpan(..Max(ic.FindLastIndex(x => x <= bitList.Length - level * BitsPerByte - startKGlobal), 0)).GroupIndexes(iIC => bitList.GetSmallRange((int)iIC + startKGlobal, BitsPerByte)).FilterInPlace(x => x.Length >= 2).Convert(x => x.ToArray(index => ic[index]).Sort());
+				var nextCodes = ic.GetSlice(..Max(ic.FindLastIndex(x => x <= bitList.Length - level * BitsPerByte - startKGlobal), 0)).GroupIndexes(iIC => bitList.GetSmallRange((int)iIC + startKGlobal, BitsPerByte)).FilterInPlace(x => x.Length >= 2).Convert(x => x.ToArray(index => ic[index]).Sort());
 				var nextCodes2 = nextCodes.JoinIntoSingle().ToHashSet();
 				ic = ic.Filter(x => !nextCodes2.Contains(x)).ToArray();
 				nextCodes.ForEach(x => FindMatchesRecursive(x, level + 1));
@@ -607,7 +607,7 @@ internal partial class Compression
 				var iIC = (int)ic[i];
 				if (maxReached.Length != 0 && Lock(lockObj, () => CreateVar(maxReached.IndexOfNotLess(iIC), out var mr) >= 1 && maxReachedLengths[maxReached[mr - 1]] > iIC - maxReached[mr - 1]))
 					continue;
-				var matches = ic.AsSpan((Array.FindLastIndex(ic, i - 1, x => iIC - x >= LZDictionarySize * BitsPerByte) + 1)..i).Filter(jIC => iIC - jIC >= 2 && RedStarLinq.Equals(bitList.GetRange(iIC, startK), bitList.GetRange((int)jIC, startK)));
+				var matches = ic.GetSlice((Array.FindLastIndex(ic, i - 1, x => iIC - x >= LZDictionarySize * BitsPerByte) + 1)..i).Filter(jIC => iIC - jIC >= 2 && RedStarLinq.Equals(bitList.GetRange(iIC, startK), bitList.GetRange((int)jIC, startK)));
 				var ub = bitList.Length - iIC - 1;
 				if (matches.Length == 0 || ub < startK)
 					continue;
@@ -829,22 +829,22 @@ public static class Executions
 		Thread.CurrentThread.Priority = ThreadPriority.Lowest;
 		Threads.ForEach(x => x?.Start());
 		Threads.ForEach(x => x?.Join());
-		if ((PresentMethods & UsedMethods.CS7) != 0 && s[6].Length < cs.Length && s[6].Length > 0 && s.AsSpan(0, 6).All(x => s[6].Length < x.Length))
+		if ((PresentMethods & UsedMethods.CS7) != 0 && s[6].Length < cs.Length && s[6].Length > 0 && s.GetSlice(0, 6).All(x => s[6].Length < x.Length))
 		{
 			misc = miscP7;
 			cs = s[6];
 		}
-		else if ((PresentMethods & UsedMethods.CS6) != 0 && s[5].Length < cs.Length && s[5].Length > 0 && s.AsSpan(0, 5).All(x => s[5].Length < x.Length))
+		else if ((PresentMethods & UsedMethods.CS6) != 0 && s[5].Length < cs.Length && s[5].Length > 0 && s.GetSlice(0, 5).All(x => s[5].Length < x.Length))
 		{
 			misc = miscP6;
 			cs = s[5];
 		}
-		else if ((PresentMethods & UsedMethods.CS5) != 0 && s[4].Length < cs.Length && s[4].Length > 0 && s.AsSpan(0, 4).All(x => s[4].Length < x.Length))
+		else if ((PresentMethods & UsedMethods.CS5) != 0 && s[4].Length < cs.Length && s[4].Length > 0 && s.GetSlice(0, 4).All(x => s[4].Length < x.Length))
 		{
 			misc = miscP5;
 			cs = s[4];
 		}
-		else if ((PresentMethods & UsedMethods.CS4) != 0 && s[3].Length < cs.Length && s[3].Length > 0 && s.AsSpan(0, 3).All(x => s[3].Length < x.Length))
+		else if ((PresentMethods & UsedMethods.CS4) != 0 && s[3].Length < cs.Length && s[3].Length > 0 && s.GetSlice(0, 3).All(x => s[3].Length < x.Length))
 		{
 			hf = hfP4;
 			bwt = 42;
@@ -876,8 +876,17 @@ public static class Executions
 			return new byte[] { 0 }.Concat(originalFile).ToArray();
 		var compressedFile = new[] { (byte)(misc + lz + bwt + rle + hf) }.Concat(cs).ToArray();
 #if DEBUG
-		if (!(originalFile.TryWrap(x => RedStarLinq.Equals(x, Decoding.Decode(compressedFile, ProgramVersion)), out var success) && success))
+		try
+		{
+			var decoded = Decoding.Decode(compressedFile, ProgramVersion);
+			for (var i = 0; i < originalFile.Length; i++)
+				if (originalFile[i] != decoded[i])
+					throw new DecoderFallbackException();
+		}
+		catch
+		{
 			throw new DecoderFallbackException();
+		}
 #endif
 		return compressedFile;
 	}

@@ -172,7 +172,7 @@ void WorkUpReceiveMessage(byte[] message)
 		{
 			var timeString = "";
 #if !DEBUG
-			TimeSpan elapsed = DateTime.Now - compressionStart;
+			var elapsed = DateTime.Now - compressionStart;
 			timeString += " (" + (elapsed.Days == 0 ? "" : $"{elapsed.Days:D}:") + (elapsed.Days == 0 && elapsed.Hours == 0 ? "" : $"{elapsed.Hours:D2}:") + $"{elapsed.Minutes:D2}:{elapsed.Seconds:D2}.{elapsed.Milliseconds:D3})";
 #endif
 			if (operation_type == OperationType.Opening)

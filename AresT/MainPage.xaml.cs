@@ -40,6 +40,7 @@ public partial class MainPage : ContentPage
 	private readonly List<NetworkStream> netStream = new(); //список потока данных
 	private readonly int port = 11000;
 	private Process executor;
+	private int executorId;
 #if RELEASE
 	private readonly Random random = new(1234567890);
 #endif
@@ -185,6 +186,15 @@ public partial class MainPage : ContentPage
 
 	private async void ExecutorExited(object? sender, EventArgs? e)
 	{
+		var tempFilename = (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-" + executorId + ".tmp";
+		try
+		{
+			if (File.Exists(tempFilename))
+				File.Delete(tempFilename);
+		}
+		catch
+		{
+		}
 		var button = await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Произошла серьезная ошибка в рабочем модуле Ares и он аварийно завершился. Нажмите ОК, чтобы перезапустить его, или Отмена, чтобы выйти из приложения.", "ОК", "Отмена"));
 		if (!button)
 			Environment.Exit(0);
@@ -194,7 +204,8 @@ public partial class MainPage : ContentPage
 
 	private void StartExecutor()
 	{
-		executor = ExecFunction.Start(AresTLib.MainClass.Main, new[] { port.ToString(), Environment.ProcessId.ToString() });
+		executor = ExecFunction.Start(MainClass.Main, new[] { port.ToString(), Environment.ProcessId.ToString() });
+		executorId = executor.Id;
 		executor.EnableRaisingEvents = true;
 		executor.Exited += ExecutorExited;
 	}
@@ -251,7 +262,7 @@ public partial class MainPage : ContentPage
 			{
 				var timeString = "";
 #if !DEBUG
-				TimeSpan elapsed = DateTime.Now - compressionStart;
+				var elapsed = DateTime.Now - compressionStart;
 				timeString += " (" + (elapsed.Days == 0 ? "" : $"{elapsed.Days:D}:") + (elapsed.Days == 0 && elapsed.Hours == 0 ? "" : $"{elapsed.Hours:D2}:") + $"{elapsed.Minutes:D2}:{elapsed.Seconds:D2}.{elapsed.Milliseconds:D3})";
 #endif
 				if (operation_type == OperationType.Opening)
