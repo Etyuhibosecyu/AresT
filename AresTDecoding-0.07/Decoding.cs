@@ -179,7 +179,7 @@ public static class Decoding
 		{
 			var counter2 = 7;
 			lzRDist = ar.ReadEqual(3);
-			lzMaxDist = ar.ReadCount(16);
+			lzMaxDist = ar.ReadCount();
 			if (lzRDist != 0)
 			{
 				lzThresholdDist = ar.ReadEqual(lzMaxDist + 1);
@@ -497,14 +497,14 @@ public static class Decoding
 				throw new DecoderFallbackException();
 		}
 		uint counter = ar.ReadCount(), dicsize = ar.ReadCount();
-		if (counter is < 0 or > FragmentLength || dicsize is < 0 or > FragmentLength)
+		if (counter > FragmentLength || dicsize > FragmentLength)
 			throw new DecoderFallbackException();
 		Status[0] = 0;
 		StatusMaximum[0] = (int)counter;
 		List<ShortIntervalList> result = new();
 		SumSet<uint> globalSet = new(), newItemsSet = n == 2 ? new() : new(new Chain((int)inputBase).Convert(x => ((uint)x, 1)));
 		var maxDepth = 12;
-		var comparer = new NListEComparer<uint>();
+		var comparer = n == 2 ? (G.IEqualityComparer<NList<uint>>)new NListEComparer<uint>() : new EComparer<NList<uint>>((x, y) => x.Equals(y), x => (int)x.Progression((uint)x.Length, (x, y) => (x << 7 | x >> BitsPerInt - 7) ^ (uint)y.GetHashCode()));
 		FastDelHashSet<NList<uint>> contextHS = new(comparer);
 		List<SumSet<uint>> sumSets = new();
 		SumList lzLengthsSL = new() { 1 };

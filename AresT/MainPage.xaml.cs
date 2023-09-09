@@ -273,10 +273,12 @@ public partial class MainPage : ContentPage
 					process.StartInfo.Arguments = "\"" + path + "\"";
 					process.Start();
 					System.Threading.Thread.Sleep(MillisecondsPerSecond);
+					await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Файл успешно распакован" + timeString + "!", "ОК"));
 					process.WaitForExit();
 					File.Delete(path);
 				}
-				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Файл успешно " + (operation_type is OperationType.Compression or OperationType.Recompression ? "сжат" : "распакован") + timeString + "!", "ОК"));
+				else
+					await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Файл успешно " + (operation_type is OperationType.Compression or OperationType.Recompression ? "сжат" : "распакован") + timeString + "!", "ОК"));
 			}
 			else if (message[0] == 2)
 				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Не удалось " + (operation_type is OperationType.Compression or OperationType.Recompression ? "сжать" : "распаковать") + " файл.", "ОК"));
