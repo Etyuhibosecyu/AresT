@@ -218,12 +218,6 @@
 											ToolTipProperties.Text='Хаффман (Huff, HF) - алгоритм энтропийного сжатия, кодирующий частые элементы короткими кодами, а редкие - длинными. Для HF без специальных обозначений "элементами" являются байты, благодаря чему он быстрый и универсальный, и вместе с Лемпелем-Зивом является классикой в деле сжатия данных, но сжимает часто хуже, чем более специфические алгоритмы.'
 											IsChecked="True"
 											Text="HF" />
-										<material:CheckBox
-											x:Name="CheckBoxPSLZ1"
-											CheckChanged="CheckBoxPSLZ1_CheckedChanged"
-											ToolTipProperties.Text="Пост-скриптумный Лемпель-Зив (PSLZ) - тот же Лемпель-Зив (LZ), только выполняющийся после Хаффмана. В редких случаях может дать бо́льшую степень сжатия. Помните, что и Хаффман, и Лемпель-Зив выполняются один раз - либо в том порядке, либо в другом."
-											IsChecked="False"
-											Text="PSLZ" />
 									</VerticalStackLayout>
 									<material:CheckBox
 										x:Name="CheckBoxCS2"
@@ -251,14 +245,12 @@
 											CheckChanged="CheckBoxSHET2_CheckedChanged"
 											ToolTipProperties.Text="Stems here, endings there (SHET) - алгоритм, разделяющий основы и окончания, но, кроме этого факта, недосредственно получаемого лингвистическим анализом названия алгоритма, больше о нем ничего не известно."
 											BackgroundColor="#FFBFDF"
-											IsChecked="False"
 											Text="SHET" />
 									</VerticalStackLayout>
 									<material:CheckBox
 										x:Name="CheckBoxCS3"
 										CheckChanged="CheckBoxCS3_CheckedChanged"
 										Grid.Column="2"
-										IsChecked="False"
 										Text="C-S3" />
 									<VerticalStackLayout
 										x:Name="PanelCS3"
@@ -270,14 +262,18 @@
 											ToolTipProperties.Text='Хаффман (Huff, HF) - алгоритм энтропийного сжатия, кодирующий частые элементы короткими кодами, а редкие - длинными. Для HF без специальных обозначений "элементами" являются байты, благодаря чему он быстрый и универсальный, и вместе с Лемпелем-Зивом является классикой в деле сжатия данных, но сжимает часто хуже, чем более специфические алгоритмы.'
 											Text="  ✓     HF" />
 										<Label
-											ToolTipProperties.Text='Преобразование Барроуза-Уилера (BWT) - это алгоритм, который не только не сжимает, а даже слегка "раздувает" входной поток, да еще и "перетрясает" все его байты в непредсказуемом порядке, но, как ни парадоксально, если результат сжать Хаффманом, можно добиться намного лучшей степени сжатия, чем если применять Хаффман к результату сжатия Лемпелем-Зивом.'
+											ToolTipProperties.Text='Преобразование Барроуза-Уилера (BWT) - это алгоритм, который не только не сжимает, а даже слегка "раздувает" входной поток, да еще и "перетрясает" все его байты в непредсказуемом порядке, но, как ни парадоксально, если результат сжать Хаффманом, можно добиться намного лучшей степени сжатия, чем если применять Хаффман к результату сжатия Лемпелем-Зивом (теоретически).'
 											Text="  ✓     BWT" />
+										<material:CheckBox
+											x:Name="CheckBoxAHF3"
+											CheckChanged="CheckBoxAHF3_CheckedChanged"
+												ToolTipProperties.Text="Адаптивный Хаффман (AHF) - алгоритм энтропийного сжатия, похожий на Хаффман (HF), но способный динамически добавлять элементы в кодовую таблицу, начиная с первого, и учитывать их вероятность в текущем контексте, а не во всем файле. В результате этого сжатый текст (AB)¹⁰⁰⁰(CD)¹⁰⁰⁰(EF)¹⁰⁰⁰(GH)¹⁰⁰⁰ (показатель степени обозначает количество повторов) займет намного меньше, чем (8000 * log₂8) бит."
+												Text="AHF" />
 									</VerticalStackLayout>
 									<material:CheckBox
 										x:Name="CheckBoxCS4"
 										CheckChanged="CheckBoxCS4_CheckedChanged"
 										Grid.Column="3"
-										IsChecked="False"
 										Text="C-S4" />
 									<VerticalStackLayout
 										x:Name="PanelCS4"
@@ -289,21 +285,19 @@
 											ToolTipProperties.Text="Хаффман для слов (HFW) - историческое название алгоритма энтропийного сжатия, сжимающего слова на естественном (русском, английском) языке. Историческим оно является потому, что 1 - это не Хаффман, а арифметическое кодирование, и 2 - оно ничем не отличается от такого же для байт, а собственно слова кодирует совсем другая функция, и между ними можно вставить что-то еще, например, Лемпель-Зив."
 											Text="  ✓     HFW" />
 										<Label
-											ToolTipProperties.Text='Преобразование Барроуза-Уилера (BWT) - это алгоритм, который не только не сжимает, а даже слегка "раздувает" входной поток, да еще и "перетрясает" все его байты в непредсказуемом порядке, но, как ни парадоксально, если результат сжать Хаффманом, можно добиться намного лучшей степени сжатия, чем если применять Хаффман к результату сжатия Лемпелем-Зивом.'
+											ToolTipProperties.Text='Преобразование Барроуза-Уилера (BWT) - это алгоритм, который не только не сжимает, а даже слегка "раздувает" входной поток, да еще и "перетрясает" все его байты в непредсказуемом порядке, но, как ни парадоксально, если результат сжать Хаффманом, можно добиться намного лучшей степени сжатия, чем если применять Хаффман к результату сжатия Лемпелем-Зивом (теоретически).'
 											Text="  ✓     BWT" />
 										<material:CheckBox
 											x:Name="CheckBoxSHET4"
 											CheckChanged="CheckBoxSHET4_CheckedChanged"
 											ToolTipProperties.Text="Stems here, endings there (SHET) - алгоритм, разделяющий основы и окончания, но, кроме этого факта, недосредственно получаемого лингвистическим анализом названия алгоритма, больше о нем ничего не известно."
 											BackgroundColor="#FFBFDF"
-											IsChecked="False"
 											Text="SHET" />
 									</VerticalStackLayout>
 									<material:CheckBox
 										x:Name="CheckBoxCS5"
 										CheckChanged="CheckBoxCS5_CheckedChanged"
 										Grid.Column="4"
-										IsChecked="False"
 										Text="C-S5" />
 									<VerticalStackLayout
 										x:Name="PanelCS5"
@@ -320,7 +314,6 @@
 										x:Name="CheckBoxCS6"
 										CheckChanged="CheckBoxCS6_CheckedChanged"
 										Grid.Column="5"
-										IsChecked="False"
 										Text="C-S6" />
 									<VerticalStackLayout
 										x:Name="PanelCS6"
@@ -336,7 +329,6 @@
 										x:Name="CheckBoxCS7"
 										CheckChanged="CheckBoxCS7_CheckedChanged"
 										Grid.Column="6"
-										IsChecked="False"
 										Text="C-S7" />
 									<VerticalStackLayout
 										x:Name="PanelCS7"
@@ -352,14 +344,12 @@
 											CheckChanged="CheckBoxSHET7_CheckedChanged"
 											ToolTipProperties.Text="Stems here, endings there (SHET) - алгоритм, разделяющий основы и окончания, но, кроме этого факта, недосредственно получаемого лингвистическим анализом названия алгоритма, больше о нем ничего не известно."
 											BackgroundColor="#FFBFDF"
-											IsChecked="False"
 											Text="SHET" />
 									</VerticalStackLayout>
 									<material:CheckBox
 										x:Name="CheckBoxCS8"
 										CheckChanged="CheckBoxCS8_CheckedChanged"
 										Grid.Column="7"
-										IsChecked="False"
 										Text="C-S8" />
 									<VerticalStackLayout
 										x:Name="PanelCS8"
@@ -371,25 +361,6 @@
 											BackgroundColor="#80BFFF"
 											ToolTipProperties.Text='PPM для бит (PPMB) - поражающий воображение алгоритм сжатия - работает с произвольными данными, сжимает так, что все другие и рядом не стояли, практически моментально восстанавливается после "встряски" резкой сменой типа контента... если вы готовы к скорости меньше 1 МБ/ч и затратам RAM x5000 от размера файла (для сжатия 8 МБ ее потребуется 40 ГБ)!'
 											Text="  ✓     PPMB" />
-									</VerticalStackLayout>
-									<VerticalStackLayout
-										x:Name="PanelHFType"
-										Grid.Column="8"
-										Grid.Row="0"
-										Grid.RowSpan="2">
-										<material:RadioButtonGroupView>
-											<material:RadioButton
-												x:Name="RadioButtonSHF"
-												ToolTipProperties.Text='Хаффман (Huff, HF) - алгоритм энтропийного сжатия, кодирующий частые элементы короткими кодами, а редкие - длинными. Для HF без специальных обозначений "элементами" являются байты, благодаря чему он быстрый и универсальный, и вместе с Лемпелем-Зивом является классикой в деле сжатия данных, но сжимает часто хуже, чем более специфические алгоритмы.'
-												IsChecked="True"
-												Text="SHF" />
-											<material:RadioButton
-												x:Name="RadioButtonAHF"
-												Checked="RadioButtonAHF_CheckedChanged"
-												ToolTipProperties.Text="Адаптивный Хаффман (AHF) - алгоритм энтропийного сжатия, похожий на Хаффман (HF), но способный динамически добавлять элементы в кодовую таблицу, начиная с первого, и учитывать их вероятность в текущем контексте, а не во всем файле. В результате этого сжатый текст (AB)¹⁰⁰⁰(CD)¹⁰⁰⁰(EF)¹⁰⁰⁰(GH)¹⁰⁰⁰ (показатель степени обозначает количество повторов) займет намного меньше, чем (8000 * log₂8) бит."
-												IsChecked="False"
-												Text="AHF" />
-										</material:RadioButtonGroupView>
 									</VerticalStackLayout>
 								</Grid>
 							</VerticalStackLayout>

@@ -360,11 +360,12 @@ Unpack <filename> - распаковать файл в ту же папку, п�
 Start, Optimus, Pro, Pro+, Unlim - установить один из оптимальных режимов
 +<method>, -<method> - включить или отключить метод (можно указать несколько на строку)
 Возможные методы:
-CS1, LZ1, HF1, PSLZ1
+CS1, LZ1, HF1
 CS2, LZ2, SHET2
-CS3
+CS3, AHF3
 CS4, SHET4
-AHF
+CS6
+CS7, SHET7
 Help - помощь (этот текст)
 Exit - выход";
 WriteLine(help);
@@ -423,10 +424,10 @@ while (true)
 			usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1 | UsedMethods.CS2 | UsedMethods.LZ2 | UsedMethods.CS3 | UsedMethods.CS4;
 			goto l0;
 		case "Pro+":
-			usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1 | UsedMethods.CS2 | UsedMethods.LZ2 | UsedMethods.CS3 | UsedMethods.CS4 | UsedMethods.AHF;
+			usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1 | UsedMethods.CS2 | UsedMethods.LZ2 | UsedMethods.CS3 | UsedMethods.CS4 | UsedMethods.CS6;
 			goto l0;
 		case "Unlim":
-			usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1 | UsedMethods.CS2 | UsedMethods.LZ2 | UsedMethods.CS3 | UsedMethods.CS4 | UsedMethods.AHF;
+			usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1 | UsedMethods.CS2 | UsedMethods.LZ2 | UsedMethods.CS3 | UsedMethods.CS4 | UsedMethods.CS6 | UsedMethods.CS7;
 			goto l0;
 		case "Help":
 			WriteLine(help);
@@ -447,14 +448,16 @@ while (true)
 			"CS1" => UsedMethods.CS1,
 			"LZ1" => UsedMethods.LZ1,
 			"HF1" => UsedMethods.HF1,
-			"PSLZ1" => UsedMethods.PSLZ1,
 			"CS2" => UsedMethods.CS2,
 			"LZ2" => UsedMethods.LZ2,
 			"SHET2" => UsedMethods.SHET2,
 			"CS3" => UsedMethods.CS3,
+			"AHF3" => UsedMethods.AHF3,
 			"CS4" => UsedMethods.CS4,
 			"SHET4" => UsedMethods.SHET4,
-			"AHF" => UsedMethods.AHF,
+			"CS6" => UsedMethods.CS6,
+			"CS7" => UsedMethods.CS7,
+			"SHET7" => UsedMethods.SHET7,
 			_ => UsedMethods.None,
 		};
 		if (s[i][0] == '+')

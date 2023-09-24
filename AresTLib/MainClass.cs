@@ -277,7 +277,7 @@ public static class MainClass
 					bytes = new byte[leftLength];
 			}
 			rfs.Read(bytes, 0, bytes.Length);
-			var s = Executions.Encode(bytes);
+			var s = new Executions(bytes).Encode();
 			if (fragmentCount != 1)
 				wfs.Write(new byte[]{ (byte)(s.Length >> (BitsPerByte << 1)), (byte)(s.Length >> BitsPerByte), (byte)s.Length }, 0, 3);
 			wfs.Write(s, 0, s.Length);
@@ -323,32 +323,7 @@ public static class MainClass
 		if (continue_)
 		{
 			fragmentCount = 0;
-			BitList bits;
-			bool one = false, success = false;
-			var sequencePos = 0;
-			while (1 == 1)
-			{
-				if (sequencePos >= 2)
-					readByte = (byte)rfs.ReadByte();
-				bits = sequencePos < 2 ? new(2, (byte)(readByte >> 6)) : new(8, readByte);
-				for (var i = 0; i < bits.Length; i++)
-				{
-					if (bits[i] && one || sequencePos == FibonacciSequence.Length)
-					{
-						success = true;
-						break;
-					}
-					else
-					{
-						if (bits[i])
-							fragmentCount += FibonacciSequence[sequencePos];
-						sequencePos++;
-						one = bits[i];
-					}
-				}
-				if (success)
-					break;
-			}
+			DecodeFibonacci(rfs, readByte);
 			SupertotalMaximum = fragmentCount * 10;
 		}
 		byte[] bytes;
@@ -397,33 +372,7 @@ public static class MainClass
 		if (continue_)
 		{
 			fragmentCount = 0;
-			BitList bits;
-			bool one = false, success = false;
-			var sequencePos = 0;
-			while (1 == 1)
-			{
-				if (sequencePos >= 2)
-					readByte = (byte)rfs.ReadByte();
-				wfs.WriteByte(sequencePos >= 2 ? readByte : (byte)(readByte & 192 | ProgramVersion & 63));
-				bits = sequencePos >= 2 ? new(8, readByte) : new(2, (byte)(readByte >> 6));
-				for (var i = 0; i < bits.Length; i++)
-				{
-					if (bits[i] && one || sequencePos == FibonacciSequence.Length)
-					{
-						success = true;
-						break;
-					}
-					else
-					{
-						if (bits[i])
-							fragmentCount += FibonacciSequence[sequencePos];
-						sequencePos++;
-						one = bits[i];
-					}
-				}
-				if (success)
-					break;
-			}
+			DecodeFibonacci(rfs, readByte);
 			SupertotalMaximum = fragmentCount * 10;
 		}
 		byte[] bytes;
@@ -442,7 +391,7 @@ public static class MainClass
 				bytes = new byte[fragmentLength];
 				rfs.Read(bytes, 0, bytes.Length);
 			}
-			var s = Executions.Encode(Decoding.Decode(bytes, encodingVersion));
+			var s = new Executions(Decoding.Decode(bytes, encodingVersion)).Encode();
 			if (fragmentCount != 1)
 				wfs.Write(new byte[]{ (byte)(s.Length >> (BitsPerByte << 1)), (byte)(s.Length >> BitsPerByte), (byte)s.Length }, 0, 3);
 			wfs.Write(s, 0, s.Length);
@@ -463,6 +412,35 @@ public static class MainClass
 				wfs.Write(bytes2, 0, length);
 			}
 			wfs.SetLength(wfs.Position);
+		}
+	}
+
+	private static void DecodeFibonacci(FileStream rfs, byte readByte)
+	{
+		BitList bits;
+		bool one = false, success = false;
+		var sequencePos = 0;
+		while (1 == 1)
+		{
+			if (sequencePos >= 2)
+				readByte = (byte)rfs.ReadByte();
+			bits = sequencePos < 2 ? new(2, (byte)(readByte >> 6)) : new(8, readByte);
+			for (var i = 0; i < bits.Length; i++)
+			{
+				if (bits[i] && one || sequencePos == FibonacciSequence.Length)
+				{
+					success = true;
+					break;
+				}
+				else
+				{
+					if (bits[i]) fragmentCount += FibonacciSequence[sequencePos];
+					sequencePos++;
+					one = bits[i];
+				}
+			}
+			if (success)
+				break;
 		}
 	}
 }

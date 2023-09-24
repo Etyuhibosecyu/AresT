@@ -86,7 +86,7 @@ internal partial class Compression
 				if (set.Length != 0)
 					intervalsForBuffer.Add(new((uint)set.ValuesSum, (uint)set.Length * 100, (uint)(set.ValuesSum + set.Length * 100)));
 			if (set.Length == 0 || context.Length == 0)
-				set.Replace(globalSet.Copy().ExceptWith(excludingSet));
+				set.Replace(globalSet).ExceptWith(excludingSet);
 			if (frequency == 0)
 				sum = set.GetLeftValuesSum(item, out frequency);
 			if (frequency == 0)
@@ -118,7 +118,7 @@ internal partial class Compression
 					intervalsForBuffer.Add(new(input[i][j].Lower, input[i][j].Length, input[i][j].Base));
 			if (buffer.IsFull)
 				buffer.Dequeue().ForEach(x => ar.WritePart(x.Lower, x.Length, x.Base));
-			buffer.Enqueue(intervalsForBuffer);
+			buffer.Enqueue(intervalsForBuffer.Copy());
 			if (n == 2 && spaceBuffer.IsFull)
 			{
 				var space2 = spaceBuffer.Dequeue();

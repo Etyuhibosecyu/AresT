@@ -178,8 +178,8 @@ public static class Decoding
 				throw new DecoderFallbackException();
 			Status[0] = 0;
 			StatusMaximum[0] = frequencyCount;
-			var @base = hfw && n == 0 ? maxLength + 1 : hfw && n == 2 ? (uint)frequencyCount : 256;
-			if (maxFrequency > frequencyCount * 2 || frequencyCount <= 256)
+			var @base = hfw && n == 0 ? maxLength + 1 : hfw && n == 2 ? (uint)frequencyCount : ValuesInByte;
+			if (maxFrequency > frequencyCount * 2 || frequencyCount <= ValuesInByte)
 			{
 				arithmeticMap.Add((uint)maxFrequency);
 				var prev = (uint)maxFrequency;

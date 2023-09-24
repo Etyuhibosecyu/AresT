@@ -22,14 +22,14 @@ public enum UsedMethods
 	LZ1 = 1 << 1,
 	HF1 = 1 << 2,
 	//Dev1 = 1 << 3,
-	PSLZ1 = 1 << 4,
+	//Dev1_2 = 1 << 4,
 	CS2 = 1 << 5,
 	//Dev2 = 1 << 6,
 	LZ2 = 1 << 7,
 	SHET2 = 1 << 8,
 	CS3 = 1 << 9,
-	//Dev3 = 1 << 10,
-	//Dev3_2 = 1 << 11,
+	AHF3 = 1 << 10,
+	//Dev3 = 1 << 11,
 	CS4 = 1 << 12,
 	//Dev4 = 1 << 13,
 	SHET4 = 1 << 14,
@@ -41,7 +41,6 @@ public enum UsedMethods
 	//Dev7 = 1 << 20,
 	SHET7 = 1 << 21,
 	CS8 = 1 << 22,
-	AHF = 1 << 31,
 }
 
 public static class Global
@@ -49,6 +48,7 @@ public static class Global
 	public const byte ProgramVersion = 2;
 	public const int FragmentLength = 8000000;
 	public const int BWTBlockSize = 50000;
+	public static int BWTBlockExtraSize => BWTBlockSize <= 0x8000 ? 2 : BWTBlockSize <= 0x800000 ? 3 : BWTBlockSize <= 0x80000000 ? 4 : BWTBlockSize <= 0x8000000000 ? 5 : BWTBlockSize <= 0x800000000000 ? 6 : BWTBlockSize <= 0x80000000000000 ? 7 : 8;
 	public static UsedMethods PresentMethods { get; set; } = UsedMethods.CS1 | UsedMethods.HF1 | UsedMethods.LZ1 | UsedMethods.CS2 | UsedMethods.LZ2;
 	public static string[][] SHETEndinds { get; } = new[] { new[] { "а", "я", "ы", "и", "е", "у", "ю", "ой", "ей", "ам", "ям", "ами", "ями", "ах", "ях", "о", "ь", "ом", "ем", "ём", "ов", "ью", "ени", "енем", "ен", "ён", "ян", "енам", "енами", "енах" }, new[] { "ый", "ий", "ого", "его", "ому", "ему", "ым", "им", "ая", "яя", "ую", "юю", "ою", "ею", "ое", "ее", "ые", "ие", "ых", "их", "ной", "ный", "ний", "ного", "него", "ному", "нему", "ным", "ним", "ном", "нем", "ная", "няя", "ней", "ную", "нюю", "ною", "нею", "ное", "нее", "ные", "ние", "ных", "них", "он", "на", "ня", "но", "нё", "ны", "ни" }, new[] { "ть", "ать", "еть", "ить", "оть", "уть", "ыть", "ять", "овать", "евать", "л", "ал", "ел", "ил", "ол", "ул", "ыл", "ял", "овал", "евал", "ла", "ала", "ела", "ила", "ола", "ула", "ыла", "яла", "овала", "евала", "ло", "ало", "ело", "ило", "оло", "уло", "ыло", "яло", "овало", "евало", "ли", "али", "ели", "или", "оли", "ули", "ыли", "яли", "овали", "евали", "ишь", "ит", "ите", "ешь", "ёшь", "ет", "ёт", "ете", "ёте", "аешь", "аёшь", "ает", "аёт", "аем", "аём", "аете", "аёте", "еешь", "еет", "еем", "еете", "иешь", "иёшь", "иет", "иёт", "ием", "иём", "иете", "иёте", "оешь", "оет", "оем", "оете", "уешь", "уёшь", "ует", "уёт", "уем", "уём", "уете", "уёте", "ьешь", "ьёшь", "ьет", "ьёт", "ьем", "ьём", "ьете", "ьёте", "юешь", "юёшь", "юет", "юёт", "юем", "юём", "юете", "юёте", "яешь", "яет", "яем", "яете", "ут", "ют", "ают", "еют", "иют", "оют", "уют", "ьют", "юют", "яют", "ат", "ят", "ться", "аться", "еться", "иться", "оться", "уться", "ыться", "яться", "оваться", "еваться", "лся", "ался", "елся", "ился", "олся", "улся", "ылся", "ялся", "овался", "евался", "лась", "алась", "елась", "илась", "олась", "улась", "ылась", "ялась", "овалась", "евалась", "лось", "алось", "елось", "илось", "олось", "улось", "ылось", "ялось", "овалось", "евалось", "лись", "ались", "елись", "ились", "олись", "улись", "ылись", "ялись", "овались", "евались", "усь", "юсь", "ишься", "ится", "имся", "итесь", "ешься", "ёшься", "ется", "ётся", "емся", "ёмся", "етесь", "ётесь", "аешься", "аёшься", "ается", "аётся", "аемся", "аёмся", "аетесь", "аётесь", "еешься", "еется", "еемся", "еетесь", "иется", "иётся", "иемся", "иёмся", "иетесь", "иётесь", "оешься", "оется", "оемся", "оетесь", "уешься", "уёшься", "уется", "уётся", "уемся", "уёмся", "уетесь", "уётесь", "ьешься", "ьёшься", "ьется", "ьётся", "ьемся", "ьёмся", "ьетесь", "ьётесь", "юешься", "юёшься", "юется", "юётся", "юемся", "юёмся", "юетесь", "юётесь", "яешься", "яется", "яемся", "яетесь", "утся", "ются", "аются", "еются", "иются", "оются", "уются", "ьются", "юются", "яются", "атся", "ятся", "й", "ай", "ей", "ой", "уй", "ый", "яй", "йся", "айся", "ейся", "ойся", "уйся", "ыйся", "яйся", "ись", "ься", "ущий", "ющий", "ающий", "еющий", "иющий", "оющий", "ующий", "ьющий", "юющий", "яющий", "ащий", "ящий", "ущего", "ющего", "ающего", "еющего", "иющего", "оющего", "ующего", "ьющего", "юющего", "яющего", "ащего", "ящего", "ущему", "ющему", "ающему", "еющему", "иющему", "оющему", "ующему", "ьющему", "юющему", "яющему", "ащему", "ящему", "ущим", "ющим", "ающим", "еющим", "иющим", "оющим", "ующим", "ьющим", "юющим", "яющим", "ащим", "ящим", "ущем", "ющем", "ающем", "еющем", "иющем", "оющем", "ующем", "ьющем", "юющем", "яющем", "ащем", "ящем", "ущая", "ющая", "ающая", "еющая", "иющая", "оющая", "ующая", "ьющая", "юющая", "яющая", "ащая", "ящая", "ущей", "ющей", "ающей", "еющей", "иющей", "оющей", "ующей", "ьющей", "юющей", "яющей", "ащей", "ящей", "ущую", "ющую", "ающую", "еющую", "иющую", "оющую", "ующую", "ьющую", "юющую", "яющую", "ащую", "ящую", "ущее", "ющее", "ающее", "еющее", "иющее", "оющее", "ующее", "ьющее", "юющее", "яющее", "ащее", "ящее", "ущие", "ющие", "ающие", "еющие", "иющие", "оющие", "ующие", "ьющие", "юющие", "яющие", "ащие", "ящие", "ущих", "ющих", "ающих", "еющих", "иющих", "оющих", "ующих", "ьющих", "юющих", "яющих", "ащих", "ящих", "ущими", "ющими", "ающими", "еющими", "иющими", "оющими", "ующими", "ьющими", "юющими", "яющими", "ащими", "ящими", "ущийся", "ющийся", "ающийся", "еющийся", "иющийся", "оющийся", "ующийся", "ьющийся", "юющийся", "яющийся", "ащийся", "ящийся", "ущегося", "ющегося", "ающегося", "еющегося", "иющегося", "оющегося", "ующегося", "ьющегося", "юющегося", "яющегося", "ащегося", "ящегося", "ущемуся", "ющемуся", "ающемуся", "еющемуся", "иющемуся", "оющемуся", "ующемуся", "ьющемуся", "юющемуся", "яющемуся", "ащемуся", "ящемуся", "ущимся", "ющимся", "ающимся", "еющимся", "иющимся", "оющимся", "ующимся", "ьющимся", "юющимся", "яющимся", "ащимся", "ящимся", "ущемся", "ющемся", "ающемся", "еющемся", "иющемся", "оющемся", "ующемся", "ьющемся", "юющемся", "яющемся", "ащемся", "ящемся", "ущаяся", "ющаяся", "ающаяся", "еющаяся", "иющаяся", "оющаяся", "ующаяся", "ьющаяся", "юющаяся", "яющаяся", "ащаяся", "ящаяся", "ущейся", "ющейся", "ающейся", "еющейся", "иющейся", "оющейся", "ующейся", "ьющейся", "юющейся", "яющейся", "ащейся", "ящейся", "ущуюся", "ющуюся", "ающуюся", "еющуюся", "иющуюся", "оющуюся", "ующуюся", "ьющуюся", "юющуюся", "яющуюся", "ащуюся", "ящуюся", "ущееся", "ющееся", "ающееся", "еющееся", "иющееся", "оющееся", "ующееся", "ьющееся", "юющееся", "яющееся", "ащееся", "ящееся", "ущиеся", "ющиеся", "ающиеся", "еющиеся", "иющиеся", "оющиеся", "ующиеся", "ьющиеся", "юющиеся", "яющиеся", "ащиеся", "ящиеся", "ущихся", "ющихся", "ающихся", "еющихся", "иющихся", "оющихся", "ующихся", "ьющихся", "юющихся", "яющихся", "ащихся", "ящихся", "ущимися", "ющимися", "ающимися", "еющимися", "иющимися", "оющимися", "ующимися", "ьющимися", "юющимися", "яющимися", "ащимися", "ящимися", "вший", "авший", "евший", "ивший", "овший", "увший", "ывший", "явший", "овавший", "евавший", "вшего", "авшего", "евшего", "ившего", "овшего", "увшего", "ывшего", "явшего", "овавшего", "евавшего", "вшему", "авшему", "евшему", "ившему", "овшему", "увшему", "ывшему", "явшему", "овавшему", "евавшему", "вшим", "авшим", "евшим", "ившим", "овшим", "увшим", "ывшим", "явшим", "овавшим", "евавшим", "вшем", "авшем", "евшем", "ившем", "овшем", "увшем", "ывшем", "явшем", "овавшем", "евавшем", "вшая", "авшая", "евшая", "ившая", "овшая", "увшая", "ывшая", "явшая", "овавшая", "евавшая", "вшей", "авшей", "евшей", "ившей", "овшей", "увшей", "ывшей", "явшей", "овавшей", "евавшей", "вшую", "авшую", "евшую", "ившую", "овшую", "увшую", "ывшую", "явшую", "овавшую", "евавшую", "вшее", "авшее", "евшее", "ившее", "овшее", "увшее", "ывшее", "явшее", "овавшее", "евавшее", "вшие", "авшие", "евшие", "ившие", "овшие", "увшие", "ывшие", "явшие", "овавшие", "евавшие", "вших", "авших", "евших", "ивших", "овших", "увших", "ывших", "явших", "овавших", "евавших", "вшими", "авшими", "евшими", "ившими", "овшими", "увшими", "ывшими", "явшими", "овавшими", "евавшими", "вшийся", "авшийся", "евшийся", "ившийся", "овшийся", "увшийся", "ывшийся", "явшийся", "овавшийся", "евавшийся", "вшегося", "авшегося", "евшегося", "ившегося", "овшегося", "увшегося", "ывшегося", "явшегося", "овавшегося", "евавшегося", "вшемуся", "авшемуся", "евшемуся", "ившемуся", "овшемуся", "увшемуся", "ывшемуся", "явшемуся", "овавшемуся", "евавшемуся", "вшимся", "авшимся", "евшимся", "ившимся", "овшимся", "увшимся", "ывшимся", "явшимся", "овавшимся", "евавшимся", "вшемся", "авшемся", "евшемся", "ившемся", "овшемся", "увшемся", "ывшемся", "явшемся", "овавшемся", "евавшемся", "вшаяся", "авшаяся", "евшаяся", "ившаяся", "овшаяся", "увшаяся", "ывшаяся", "явшаяся", "овавшаяся", "евавшаяся", "вшейся", "авшейся", "евшейся", "ившейся", "овшейся", "увшейся", "ывшейся", "явшейся", "овавшейся", "евавшейся", "вшуюся", "авшуюся", "евшуюся", "ившуюся", "овшуюся", "увшуюся", "ывшуюся", "явшуюся", "овавшуюся", "евавшуюся", "вшееся", "авшееся", "евшееся", "ившееся", "овшееся", "увшееся", "ывшееся", "явшееся", "овавшееся", "евавшееся", "вшиеся", "авшиеся", "евшиеся", "ившиеся", "овшиеся", "увшиеся", "ывшиеся", "явшиеся", "овавшиеся", "евавшиеся", "вшихся", "авшихся", "евшихся", "ившихся", "овшихся", "увшихся", "ывшихся", "явшихся", "овавшихся", "евавшихся", "вшимися", "авшимися", "евшимися", "ившимися", "овшимися", "увшимися", "ывшимися", "явшимися", "овавшимися", "евавшимися",
 			"имый", "емый", "аемый", "еемый", "оемый", "уемый", "юемый", "яемый", "омый", "имого", "емого", "аемого", "еемого", "оемого", "уемого", "юемого", "яемого", "омого", "имому", "емому", "аемому", "еемому", "оемому", "уемому", "юемому", "яемому", "омому", "имым", "емым", "аемым", "еемым", "оемым", "уемым", "юемым", "яемым", "омым", "имом", "емом", "аемом", "еемом", "оемом", "уемом", "юемом", "яемом", "омом", "имая", "емая", "аемая", "еемая", "оемая", "уемая", "юемая", "яемая", "омая", "имой", "емой", "аемой", "еемой", "оемой", "уемой", "юемой", "яемой", "омой", "имую", "емую", "аемую", "еемую", "оемую", "уемую", "юемую", "яемую", "омую", "имое", "емое", "аемое", "еемое", "оемое", "уемое", "юемое", "яемое", "омое", "имые", "емые", "аемые", "еемые", "оемые", "уемые", "юемые", "яемые", "омые", "имых", "емых", "аемых", "еемых", "оемых", "уемых", "юемых", "яемых", "омых", "имыми", "емыми", "аемыми", "еемыми", "оемыми", "уемыми", "юемыми", "яемыми", "омыми", "аный", "еный", "ёный", "яный", "ованый", "еваный", "ёваный", "анный", "енный", "ённый", "янный", "ованный", "еванный", "ёванный", "аного", "еного", "ёного", "яного", "ованого", "еваного", "ёваного", "анного", "енного", "ённого", "янного", "ованного", "еванного", "ёванного", "аному", "еному", "ёному", "яному", "ованому", "еваному", "ёваному", "анному", "енному", "ённому", "янному", "ованному", "еванному", "ёванному", "аным", "еным", "ёным", "яным", "ованым", "еваным", "ёваным", "анным", "енным", "ённым", "янным", "ованным", "еванным", "ёванным", "аном", "еном", "ёном", "яном", "ованом", "еваном", "ёваном", "анном", "енном", "ённом", "янном", "ованном", "еванном", "ёванном", "аная", "еная", "ёная", "яная", "ованая", "еваная", "ёваная", "анная", "енная", "ённая", "янная", "ованная", "еванная", "ёванная", "аной", "еной", "ёной", "яной", "ованой", "еваной", "ёваной", "анной", "енной", "ённой", "янной", "ованной", "еванной", "ёванной", "аную", "еную", "ёную", "яную", "ованую", "еваную", "ёваную", "анную", "енную", "ённую", "янную", "ованную", "еванную", "ёванную", "аное", "еное", "ёное", "яное", "ованое", "еваное", "ёваное", "анное", "енное", "ённое", "янное", "ованное", "еванное", "ёванное", "аные", "еные", "ёные", "яные", "ованые", "еваные", "ёваные", "анные", "енные", "ённые", "янные", "ованные", "еванные", "ёванные", "аных", "еных", "ёных", "яных", "ованых", "еваных", "ёваных", "анных", "енных", "ённых", "янных", "ованных", "еванных", "ёванных", "аными", "еными", "ёными", "яными", "оваными", "еваными", "ёваными", "анными", "енными", "ёнными", "янными", "ованными", "еванными", "ёванными", "тый", "атый", "етый", "итый", "отый", "утый", "ытый", "ятый", "того", "атого", "етого", "итого", "отого", "утого", "ытого", "ятого", "тому", "атому", "етому", "итому", "отому", "утому", "ытому", "ятому", "тым", "атым", "етым", "итым", "отым", "утым", "ытым", "ятым", "том", "атом", "етом", "итом", "отом", "утом", "ытом", "ятом", "тая", "атая", "етая", "итая", "отая", "утая", "ытая", "ятая", "той", "атой", "етой", "итой", "отой", "утой", "ытой", "ятой", "тую", "атую", "етую", "итую", "отую", "утую", "ытую", "ятую", "тое", "атое", "етое", "итое", "отое", "утое", "ытое", "ятое", "тые", "атые", "етые", "итые", "отые", "утые", "ытые", "ятые", "тых", "атых", "етых", "итых", "отых", "утых", "ытых", "ятых", "тыми", "атыми", "етыми", "итыми", "отыми", "утыми", "ытыми", "ятыми", "учи", "ючи", "аючи", "еючи", "иючи", "оючи", "уючи", "ьючи", "юючи", "яючи", "в", "ав", "ев", "ив", "ув", "ыв", "яв", "овав", "евав", "вши", "авши", "евши", "ивши", "овши", "увши", "ывши", "явши", "овавши", "евавши", "ши", "ась", "ясь", "учись", "ючись", "аючись", "еючись", "иючись", "оючись", "уючись", "ьючись", "юючись", "яючись", "вшись", "авшись", "евшись", "ившись", "овшись", "увшись", "ывшись", "явшись", "овавшись", "евавшись", "шись" }, new[] { "без", "безо", "близ", "в", "вблизи", "ввиду", "вглубь", "вдогон", "вдоль", "взамен", "включая", "вкруг", "вместо", "вне", "внизу", "внутри", "внутрь", "во", "вовнутрь", "возле", "вокруг", "вопреки", "впереди", "вроде", "вслед", "вследствие", "встречу", "выключая", "для", "до", "за", "заместо", "из", "изнутри", "изо", "исключая", "к", "касаемо", "касательно", "ко", "кончая", "кроме", "кругом", "меж", "между", "мимо", "на", "наверху", "навстречу", "над", "надо", "назад", "назло", "накануне", "наперекор", "наперерез", "наподобие", "напротив", "насчёт", "ниже", "о", "об", "обо", "обок", "около", "от", "относительно", "ото", "перед", "передо", "по", "поверх", "под", "под видом", "подле", "подо", "подобно", "позади", "помимо", "поперёд", "поперёк", "порядка", "посередине", "после", "посреди", "посредине", "посредством", "пред", "предо", "прежде", "при", "про", "против", "путём", "ради", "с", "сверх", "сверху", "свыше", "сзади", "сквозь", "снизу", "со", "согласно", "спустя", "среди", "средь", "сродни", "супротив", "у", "через", "черезо", "чрез" } };
@@ -111,7 +111,7 @@ public static class Decoding
 		}
 		else if (misc == 1)
 			byteList = DecodePPM(compressedFile[1..], ValuesInByte, ref repeatsCount).PNConvert(x => (byte)x[0].Lower);
-		else
+		else if (hf + lz + bwt != 0)
 		{
 			Current[0] = 0;
 			CurrentMaximum[0] = ProgressBarStep * (bwt != 0 ? (hfw ? 8 : 4) : (hfw ? 7 : 3));
@@ -119,12 +119,14 @@ public static class Decoding
 			ListHashSet<int> nulls = new();
 			byteList = hfw ? RedStarLinq.Fill(3, i => Decode2(ar, hf, hfw, bwt, lz, ref repeatsCount, nulls, i)).JoinWords(nulls) : Decode2(ar, hf, hfw, bwt, lz, ref repeatsCount).PNConvert(x => (byte)x[0].Lower);
 		}
+		else
+			byteList = compressedFile.GetSlice(1).ToNList();
 		Current[0] += ProgressBarStep;
 		if (rle == 14)
-			byteList = DecodeRLE3(byteList);
+			byteList = byteList.DecodeRLE3();
 		Current[0] += ProgressBarStep;
 		if (rle == 7)
-			byteList = DecodeRLE(byteList);
+			byteList = byteList.DecodeRLE();
 		return byteList.Repeat(repeatsCount).ToArray();
 	}
 
@@ -151,7 +153,7 @@ public static class Decoding
 		int maxFrequency = 0, frequencyCount = 0;
 		List<uint> arithmeticMap = new();
 		List<Interval> uniqueList = new();
-		List<int> skipped = new();
+		List<byte> skipped = new();
 		if (n == 0)
 		{
 			var repeats = ar.ReadPart(new List<uint>(2, 224, 225));
@@ -231,8 +233,8 @@ public static class Decoding
 				throw new DecoderFallbackException();
 			Status[0] = 0;
 			StatusMaximum[0] = frequencyCount;
-			var @base = hfw && n == 0 ? maxLength + 1 : hfw && n == 2 ? (uint)frequencyCount : 256;
-			if (maxFrequency > frequencyCount * 2 || frequencyCount <= 256)
+			var @base = hfw && n == 0 ? maxLength + 1 : hfw && n == 2 ? (uint)frequencyCount : ValuesInByte;
+			if (maxFrequency > frequencyCount * 2 || frequencyCount <= ValuesInByte)
 			{
 				arithmeticMap.Add((uint)maxFrequency);
 				var prev = (uint)maxFrequency;
@@ -260,18 +262,18 @@ public static class Decoding
 			{
 				var skippedCount = (int)ar.ReadCount();
 				for (var i = 0; i < skippedCount; i++)
-					skipped.Add((int)ar.ReadEqual(@base));
+					skipped.Add((byte)ar.ReadEqual(@base));
 				counter -= (skippedCount + 9) / 8;
 			}
 		}
 		else
 		{
-			uniqueList.AddRange(RedStarLinq.Fill(256, index => new Interval((uint)index, 256)));
-			arithmeticMap.AddRange(RedStarLinq.Fill(256, index => (uint)(index + 1)));
+			uniqueList.AddRange(RedStarLinq.Fill(ValuesInByte, index => new Interval((uint)index, ValuesInByte)));
+			arithmeticMap.AddRange(RedStarLinq.Fill(ValuesInByte, index => (uint)(index + 1)));
 			if (lz != 0)
 				arithmeticMap.Add(269);
 		}
-		if (counter is < 0 or > FragmentLength)
+		if (counter is < 0 or > FragmentLength + FragmentLength / 1000)
 			throw new DecoderFallbackException();
 		HuffmanData huffmanData = (maxFrequency, frequencyCount, arithmeticMap, uniqueList);
 		Current[0] += ProgressBarStep;
@@ -281,15 +283,15 @@ public static class Decoding
 			compressedList.Add(new() { new(encoding, 3) });
 		if (bwt != 0 && !(hfw && n != 1))
 		{
-			Current[0]++;
+			Current[0] += ProgressBarStep;
 			compressedList = compressedList.DecodeBWT(skipped);
 		}
 		if (hfw && n != 2)
-			Current[0]++;
+			Current[0] += ProgressBarStep;
 		return compressedList;
 	}
 
-	private static List<ShortIntervalList> DecodeAdaptive(this ArithmeticDecoder ar, bool hfw, int bwt, List<int> skipped, LZData lzData, int lz, int counter, int n)
+	private static List<ShortIntervalList> DecodeAdaptive(this ArithmeticDecoder ar, bool hfw, int bwt, List<byte> skipped, LZData lzData, int lz, int counter, int n)
 	{
 		if (bwt != 0 && !(hfw && n != 1))
 		{
@@ -298,7 +300,7 @@ public static class Decoding
 			if (skippedCount > @base || @base > FragmentLength)
 				throw new DecoderFallbackException();
 			for (var i = 0; i < skippedCount; i++)
-				skipped.Add((int)ar.ReadEqual(@base));
+				skipped.Add((byte)ar.ReadEqual(@base));
 			counter -= skippedCount == 0 ? 1 : (skippedCount + 11) / 8;
 		}
 		var fileBase = ar.ReadCount();
@@ -402,7 +404,8 @@ public static class Decoding
 			if (lz != 0 && distsSL.Length < firstIntervalDist)
 				new Chain((int)Min(firstIntervalDist - distsSL.Length, (length + 2) * (spiralLength + 1))).ForEach(x => distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1));
 		}
-		return DecodeLempelZiv(result, lz != 0, 0, 0, 0, 0, lzData.UseSpiralLengths, 0, 0, 0);
+		Current[0] += ProgressBarStep;
+		return result.DecodeLempelZiv(lz != 0, 0, 0, 0, 0, lzData.UseSpiralLengths, 0, 0, 0);
 	}
 
 	private static List<ShortIntervalList> ReadCompressedList(this ArithmeticDecoder ar, HuffmanData huffmanData, int bwt, LZData lzData, int lz, int counter, bool spaceCodes)
@@ -509,13 +512,17 @@ public static class Decoding
 		List<SumSet<uint>> sumSets = new();
 		SumList lzLengthsSL = new() { 1 };
 		List<uint> preLZMap = new(2, 1, 2), spacesMap = new(2, 1, 2);
+		NList<uint> context = new(maxDepth), context2 = new(maxDepth);
+		SumSet<uint>? set = new(), excludingSet = new();
 		uint nextWordLink = 0;
 		for (; (int)counter > 0; counter--, Status[0]++)
 		{
-			var context = result.GetSlice(Max(result.Length - maxDepth, 0)..).NConvert(x => x[0].Lower).Reverse();
-			var context2 = context.Copy();
+			result.GetSlice(Max(result.Length - maxDepth, 0)..).ForEach((x, index) => context.SetOrAdd(index, x[0].Lower));
+			context.Reverse();
+			context2.Replace(context);
 			var index = -1;
-			SumSet<uint>? set = null, excludingSet = new();
+			set.Clear();
+			excludingSet.Clear();
 			uint item;
 			if (context.Length == maxDepth && counter > maxDepth)
 			{
@@ -532,10 +539,10 @@ public static class Decoding
 			}
 			for (; context.Length > 0 && !contextHS.TryGetIndexOf(context, out index); context.RemoveAt(^1)) ;
 			var arithmeticIndex = -1;
-			for (; context.Length > 0 && contextHS.TryGetIndexOf(context, out index) && (arithmeticIndex = (set = sumSets[index].Copy().ExceptWith(excludingSet)).Length == 0 ? 1 : ar.ReadPart(new List<uint>(2, (uint)set.ValuesSum, (uint)(set.ValuesSum + set.Length * 100)))) == 1; context.RemoveAt(^1), excludingSet.UnionWith(set)) ;
-			if (set == null || context.Length == 0)
+			for (; context.Length > 0 && contextHS.TryGetIndexOf(context, out index) && (arithmeticIndex = set.Replace(sumSets[index]).ExceptWith(excludingSet).Length == 0 ? 1 : ar.ReadPart(new List<uint>(2, (uint)set.ValuesSum, (uint)(set.ValuesSum + set.Length * 100)))) == 1; context.RemoveAt(^1), excludingSet.UnionWith(set)) ;
+			if (set.Length == 0 || context.Length == 0)
 			{
-				set = globalSet.Copy().ExceptWith(excludingSet);
+				set.Replace(globalSet).ExceptWith(excludingSet);
 				if (set.Length != 0 && (arithmeticIndex = ar.ReadPart(new List<uint>(2, (uint)set.ValuesSum, (uint)(set.ValuesSum + set.Length * 100)))) != 1)
 				{
 					if (set.Length != 0) arithmeticIndex = ar.ReadPart(set);
@@ -562,9 +569,7 @@ public static class Decoding
 				spacesMap[0] += 1 - space;
 				spacesMap[1]++;
 			}
-			Increase(context2, item);
-			context.Dispose();
-			context2.Dispose();
+			Increase(context2, context, item);
 		}
 		void ProcessLZ(int curPos)
 		{
@@ -588,22 +593,20 @@ public static class Decoding
 			for (var i = 0; i < length + maxDepth - 1; i++)
 			{
 				result.Add(result[oldPos + i]);
-				Increase(result.GetSlice(result.Length - maxDepth - 1, maxDepth).NConvert(x => x[0].Lower).Reverse(), result[^1][0].Lower);
+				Increase(result.GetSlice(result.Length - maxDepth - 1, maxDepth).NConvert(x => x[0].Lower).Reverse(), context, result[^1][0].Lower);
 			}
 			preLZMap[1]++;
 			var decrease = length + maxDepth - 2;
 			counter -= (uint)decrease;
 			Status[0] += (int)decrease;
 		}
-		void Increase(NList<uint> context, uint item)
+		void Increase(NList<uint> context, NList<uint> successContext, uint item)
 		{
-			for (; context.Length > 0 && !contextHS.TryGetIndexOf(context, out var index); context.RemoveAt(^1))
-			{
-				contextHS.TryAdd(context.Copy(), out index);
+			for (; context.Length > 0 && contextHS.TryAdd(context.Copy(), out var index); context.RemoveAt(^1))
 				sumSets.SetOrAdd(index, new() { (item, 100) });
-			}
 			var successLength = context.Length;
-			for (; context.Length > 0 && contextHS.TryGetIndexOf(context, out var index); context.RemoveAt(^1))
+			_ = context.Length == 0 ? null : successContext.Replace(context).RemoveAt(^1);
+			for (; context.Length > 0 && contextHS.TryGetIndexOf(context, out var index); context.RemoveAt(^1), _ = context.Length == 0 ? null : successContext.RemoveAt(^1))
 			{
 				if (!sumSets[index].TryGetValue(item, out var itemValue))
 				{
@@ -615,7 +618,6 @@ public static class Decoding
 					sumSets[index].Update(item, itemValue + (int)Max(Round((double)100 / (successLength - context.Length + 1)), 1));
 					continue;
 				}
-				var successContext = context.Copy().RemoveAt(^1);
 				var successIndex = contextHS.IndexOf(successContext);
 				if (!sumSets[successIndex].TryGetValue(item, out var successValue))
 					successValue = 100;
@@ -630,43 +632,108 @@ public static class Decoding
 		return result;
 	}
 
-	private static List<ShortIntervalList> DecodeBWT(this List<ShortIntervalList> input, List<int> skipped)
+	public static List<ShortIntervalList> DecodeBWT(this List<ShortIntervalList> input, List<byte> skipped)
 	{
 		Status[0] = 0;
-		StatusMaximum[0] = GetArrayLength(input.Length, BWTBlockSize + 2);
-		var hs = input.Convert(x => (int)x[0].Lower).FilterInPlace((x, index) => index % (BWTBlockSize + 2) is not (0 or 1)).ToHashSet().Concat(skipped).Sort().ToHashSet();
-		List<ShortIntervalList> result = new(input.Length);
-		for (var i = 0; i < input.Length; i += BWTBlockSize + 2, Status[0]++)
+		StatusMaximum[0] = GetArrayLength(input.Length, BWTBlockSize + BWTBlockExtraSize);
+		var bytes = input.NConvert(x => (byte)x[0].Lower);
+		NList<byte> bytes2 = new();
+		for (var i = 0; i < bytes.Length;)
 		{
-			if (input.Length - i < 3)
+			var rle = bytes[i] & ValuesInByte >> 1;
+			bytes2.AddRange(bytes.GetSlice(i..(i += BWTBlockExtraSize)));
+			bytes2.AddRange(rle == 0 ? bytes.DecodeRLEAfterBWT(ref i) : bytes.GetRange(i..Min(i += BWTBlockSize, bytes.Length)));
+		}
+		var hs = bytes2.Filter((x, index) => index % (BWTBlockSize + BWTBlockExtraSize) >= BWTBlockExtraSize).ToHashSet().Concat(skipped).Sort().ToHashSet();
+		List<ShortIntervalList> result = new(bytes2.Length);
+		for (var i = 0; i < bytes2.Length; i += BWTBlockSize, Status[0]++)
+		{
+			if (bytes2.Length - i <= BWTBlockExtraSize)
 				throw new DecoderFallbackException();
-			var length = Min(BWTBlockSize, input.Length - i - 2);
-			var firstPermutation = (int)(input[i][0].Lower * input[i + 1][0].Base + input[i + 1][0].Lower);
-			result.AddRange(input.GetSlice(i + 2, length).DecodeBWT2(hs, firstPermutation));
+			var length = Min(BWTBlockSize, bytes2.Length - i - BWTBlockExtraSize);
+			bytes2[i] &= (ValuesInByte >> 1) - 1;
+			var firstPermutation = (int)bytes2.GetSlice(i, BWTBlockExtraSize).Progression(0L, (x, y) => (x << BitsPerByte) + y);
+			i += BWTBlockExtraSize;
+			result.AddRange(bytes2.GetRange(i, length).DecodeBWT2(hs, firstPermutation));
 		}
 		return result;
 	}
 
-	private static List<ShortIntervalList> DecodeBWT2(this Slice<ShortIntervalList> input, ListHashSet<int> hs, int firstPermutation)
+	private static List<ShortIntervalList> DecodeBWT2(this NList<byte> input, ListHashSet<byte> hs, int firstPermutation)
 	{
-		var indexCodes = input.Convert(x => (int)x[0].Lower);
 		var mtfMemory = hs.ToArray();
-		for (var i = 0; i < indexCodes.Length; i++)
+		for (var i = 0; i < input.Length; i++)
 		{
-			var index = hs.IndexOf(indexCodes[i]);
-			indexCodes[i] = mtfMemory[index];
+			var index = hs.IndexOf(input[i]);
+			input[i] = mtfMemory[index];
 			Array.Copy(mtfMemory, 0, mtfMemory, 1, index);
-			mtfMemory[0] = indexCodes[i];
+			mtfMemory[0] = input[i];
 		}
-		var sorted = indexCodes.ToArray((elem, index) => (elem, index)).NSort(x => (uint)x.elem);
+		var sorted = input.ToArray((elem, index) => (elem, index)).NSort(x => x.elem);
 		var convert = sorted.ToArray(x => x.index);
-		var result = RedStarLinq.EmptyList<ShortIntervalList>(indexCodes.Length);
+		var result = RedStarLinq.EmptyList<ShortIntervalList>(input.Length);
 		var it = firstPermutation;
-		for (var i = 0; i < indexCodes.Length; i++)
+		for (var i = 0; i < input.Length; i++)
 		{
 			it = convert[it];
-			result[i] = new() { new((uint)indexCodes[it], input[i][0].Base) };
-			input[i].GetSlice(1).ForEach(x => result[i].Add(x));
+			result[i] = new() { new(input[it], ValuesInByte) };
+		}
+		return result;
+	}
+
+	public static NList<byte> DecodeRLEAfterBWT(this NList<byte> byteList, ref int i)
+	{
+		NList<byte> result = new();
+		int length, serie, l;
+		byte temp;
+		for (; i < byteList.Length && result.Length < BWTBlockSize;)
+		{
+			result.Add(byteList[i++]);
+			if (i >= byteList.Length || result.Length >= BWTBlockSize)
+				break;
+			temp = byteList[i++];
+			if (temp >= ValuesInByte >> 1)
+				serie = 2;
+			else
+				serie = 1;
+			if (temp % (ValuesInByte >> 1) != (ValuesInByte >> 1) - 1)
+				length = temp % (ValuesInByte >> 1) + 1;
+			else
+			{
+				if (i >= byteList.Length - 1 || result.Length >= BWTBlockSize - 1)
+					break;
+				length = (byteList[i++] << BitsPerByte) + byteList[i++] + (ValuesInByte >> 1);
+			}
+			if (result.Length + length > BWTBlockSize)
+				throw new DecoderFallbackException();
+			if (serie == 1)
+			{
+				for (var j = 0; j < length; j++)
+					result.Add(0);
+				continue;
+			}
+			l = Min(length, byteList.Length - i);
+			result.AddRange(byteList.GetRange(i, l));
+			i += l;
+			if (l >= ValuesIn2Bytes)
+				continue;
+			if (i >= byteList.Length || result.Length >= BWTBlockSize)
+				break;
+			temp = byteList[i++];
+			if (temp >= ValuesInByte >> 1)
+				throw new DecoderFallbackException();
+			if (temp % (ValuesInByte >> 1) != (ValuesInByte >> 1) - 1)
+				length = temp % (ValuesInByte >> 1) + 1;
+			else
+			{
+				if (i >= byteList.Length - 1 || result.Length >= BWTBlockSize - 1)
+					break;
+				length = (byteList[i++] << BitsPerByte) + byteList[i++] + (ValuesInByte >> 1);
+			}
+			if (result.Length + length > BWTBlockSize)
+				throw new DecoderFallbackException();
+			for (var j = 0; j < length; j++)
+				result.Add(0);
 		}
 		return result;
 	}

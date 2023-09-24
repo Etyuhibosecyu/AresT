@@ -517,10 +517,9 @@ public partial class MainPage : ContentPage
 		CheckBoxCS4.IsChecked = selectedIndex >= 2;
 		CheckBoxSHET4.IsChecked = false;
 		CheckBoxCS5.IsChecked = false;
-		CheckBoxCS6.IsChecked = selectedIndex >= 4;
+		CheckBoxCS6.IsChecked = selectedIndex >= 3;
 		CheckBoxCS7.IsChecked = selectedIndex >= 4;
 		CheckBoxSHET7.IsChecked = false;
-		(selectedIndex >= 3 ? RadioButtonAHF : RadioButtonSHF).IsChecked = true;
 		SendUsedMethods();
 	}
 
@@ -558,55 +557,61 @@ public partial class MainPage : ContentPage
 
 	private void CheckBoxCS5_CheckedChanged(object? sender, EventArgs e)
 	{
+#if RELEASE
+		if (CheckBoxCS5 != null && CheckBoxCS5.IsChecked)
+		{
+			CheckBoxCS5.IsChecked = false;
+			MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Этот метод находится в разработке.", "ОК"));
+		}
+#else
 		if (PanelCS5 != null)
 			PanelCS5.IsEnabled = !PanelCS5.IsEnabled;
 		usedMethods ^= UsedMethods.CS5;
 		SendUsedMethods();
+#endif
 	}
 
 	private void CheckBoxCS6_CheckedChanged(object? sender, EventArgs e)
 	{
-		if (PanelCS5 != null)
-			PanelCS5.IsEnabled = !PanelCS6.IsEnabled;
+		if (PanelCS6 != null)
+			PanelCS6.IsEnabled = !PanelCS6.IsEnabled;
 		usedMethods ^= UsedMethods.CS6;
 		SendUsedMethods();
 	}
 
 	private void CheckBoxCS7_CheckedChanged(object? sender, EventArgs e)
 	{
-		if (PanelCS5 != null)
-			PanelCS5.IsEnabled = !PanelCS7.IsEnabled;
+		if (PanelCS7 != null)
+			PanelCS7.IsEnabled = !PanelCS7.IsEnabled;
 		usedMethods ^= UsedMethods.CS7;
 		SendUsedMethods();
 	}
 
 	private void CheckBoxCS8_CheckedChanged(object? sender, EventArgs e)
 	{
-		if (PanelCS5 != null)
-			PanelCS5.IsEnabled = !PanelCS8.IsEnabled;
+#if RELEASE
+		if (CheckBoxCS8 != null && CheckBoxCS8.IsChecked)
+		{
+			CheckBoxCS8.IsChecked = false;
+			MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Этот метод находится в разработке.", "ОК"));
+		}
+#else
+		if (PanelCS8 != null)
+			PanelCS8.IsEnabled = !PanelCS8.IsEnabled;
 		usedMethods ^= UsedMethods.CS8;
 		SendUsedMethods();
+#endif
 	}
 
 	private void CheckBoxLZ1_CheckedChanged(object? sender, EventArgs e)
 	{
 		usedMethods ^= UsedMethods.LZ1;
-		if ((usedMethods & UsedMethods.LZ1) != 0 && (usedMethods & UsedMethods.PSLZ1) != 0)
-			CheckBoxPSLZ1.IsChecked = false;
 		SendUsedMethods();
 	}
 
 	private void CheckBoxHF1_CheckedChanged(object? sender, EventArgs e)
 	{
 		usedMethods ^= UsedMethods.HF1;
-		SendUsedMethods();
-	}
-
-	private void CheckBoxPSLZ1_CheckedChanged(object sender, EventArgs e)
-	{
-		usedMethods ^= UsedMethods.PSLZ1;
-		if ((usedMethods & UsedMethods.LZ1) != 0 && (usedMethods & UsedMethods.PSLZ1) != 0)
-			CheckBoxLZ1.IsChecked = false;
 		SendUsedMethods();
 	}
 
@@ -622,6 +627,12 @@ public partial class MainPage : ContentPage
 		SendUsedMethods();
 	}
 
+	private void CheckBoxAHF3_CheckedChanged(object? sender, EventArgs e)
+	{
+		usedMethods ^= UsedMethods.AHF3;
+		SendUsedMethods();
+	}
+
 	private void CheckBoxSHET4_CheckedChanged(object? sender, EventArgs e)
 	{
 		usedMethods ^= UsedMethods.SHET4;
@@ -631,13 +642,6 @@ public partial class MainPage : ContentPage
 	private void CheckBoxSHET7_CheckedChanged(object? sender, EventArgs e)
 	{
 		usedMethods ^= UsedMethods.SHET7;
-		SendUsedMethods();
-	}
-
-	private void RadioButtonAHF_CheckedChanged(object? sender, EventArgs e)
-	{
-		if ((RadioButtonAHF?.IsChecked ?? false) ^ (usedMethods & UsedMethods.AHF) != 0)
-			usedMethods ^= UsedMethods.AHF;
 		SendUsedMethods();
 	}
 

@@ -3,29 +3,29 @@ namespace AresTLib;
 
 internal partial class Compression
 {
-	private readonly byte[] originalFile;
+	private readonly NList<byte> originalFile;
 	private readonly List<ShortIntervalList> input, result = new();
 	private readonly int tn;
 	private const int LZDictionarySize = 8388607;
 
-	public Compression(byte[] originalFile, List<ShortIntervalList> input, int tn)
+	public Compression(NList<byte> originalFile, List<ShortIntervalList> input, int tn)
 	{
 		this.originalFile = originalFile;
 		this.input = input;
 		this.tn = tn;
 	}
 
-	internal List<ShortIntervalList> PreEncode(ref int rle, out byte[] originalFile2)
+	internal List<ShortIntervalList> PreEncode(ref int rle, out NList<byte> originalFile2)
 	{
 		List<ShortIntervalList> cdl;
-		byte[] string1, string2, cstring;
+		NList<byte> string1, string2, cstring;
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 11;
 		cstring = originalFile;
 		Subtotal[tn] += ProgressBarStep;
-		string1 = new RLE(originalFile, tn).Encode();
+		string1 = new RLE(cstring, tn).Encode();
 		Subtotal[tn] += ProgressBarStep;
-		string2 = new RLE(originalFile, tn).RLE3();
+		string2 = new RLE(cstring, tn).RLE3();
 		Subtotal[tn] += ProgressBarStep;
 		Current[tn] = 0;
 		Status[tn] = 0;
@@ -75,40 +75,11 @@ internal partial class Compression
 			cs = s;
 		}
 		if ((PresentMethods & UsedMethods.HF1) != 0)
-		{
-			if ((PresentMethods & UsedMethods.AHF) != 0)
-			{
-				s = AdaptiveHuffman(cdl, lzData);
-				Subtotal[tn] += ProgressBarStep;
-			}
-			else
-			{
-				dl1 = new(new Huffman(cdl, result, tn).Encode());
-				Subtotal[tn] += ProgressBarStep;
-				s = WorkUpDoubleList(dl1, tn);
-			}
-		}
-		else
-			Subtotal[tn] += ProgressBarStep;
+			s = new AdaptiveHuffman(tn).Encode(cdl, lzData);
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < cs.Length && s.Length > 0)
 		{
-			hf = (PresentMethods & UsedMethods.AHF) != 0 ? 4 : 1;
-			cdl = dl1;
-			cs = s;
-		}
-		if ((PresentMethods & UsedMethods.PSLZ1) != 0 && (PresentMethods & UsedMethods.LZ1) == 0)
-		{
-			dl1 = new(new LempelZiv(cdl, result, tn).Encode(out _));
-			Subtotal[tn] += ProgressBarStep;
-			s = WorkUpDoubleList(dl1, tn);
-		}
-		else
-			Subtotal[tn] += ProgressBarStep;
-		Subtotal[tn] += ProgressBarStep;
-		if (s.Length < cs.Length && s.Length > 0)
-		{
-			lz = 21;
+			hf = 4;
 			cs = s;
 		}
 	}
@@ -148,26 +119,11 @@ internal partial class Compression
 			ctl = tl1;
 			cs2 = s;
 		}
-		if ((PresentMethods & UsedMethods.AHF) != 0)
-		{
-			s = AdaptiveHuffman(ctl, lzData);
-			Subtotal[tn] += ProgressBarStep;
-		}
-		else
-		{
-			for (var i = 0; i < ctl.Length; i++)
-			{
-				tl1[i] = new(new Huffman(ctl[i], result, tn).Encode());
-				if (tl1[i].Length == 0)
-					throw new EncoderFallbackException();
-				Subtotal[tn] += ProgressBarStep;
-			}
-			s = WorkUpTripleList(tl1, tn);
-		}
+		s = new AdaptiveHuffman(tn).Encode(ctl, lzData);
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < cs2.Length && s.Length > 0)
 		{
-			hf = ((PresentMethods & UsedMethods.AHF) != 0 ? 4 : 1) + ((PresentMethods & UsedMethods.SHET2) != 0 ? 2 : 1);
+			hf = 4 + ((PresentMethods & UsedMethods.SHET2) != 0 ? 2 : 1);
 			cs = s;
 		}
 	}
@@ -181,9 +137,9 @@ internal partial class Compression
 		Subtotal[tn] += ProgressBarStep;
 		dl1 = new(BWT(cdl));
 		Subtotal[tn] += ProgressBarStep;
-		if ((PresentMethods & UsedMethods.AHF) != 0)
+		if ((PresentMethods & UsedMethods.AHF3) != 0)
 		{
-			s = AdaptiveHuffman(dl1, new());
+			s = new AdaptiveHuffman(tn).Encode(dl1, new());
 			Subtotal[tn] += ProgressBarStep;
 		}
 		else
@@ -195,7 +151,7 @@ internal partial class Compression
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < cs.Length && s.Length > 0)
 		{
-			hf = (PresentMethods & UsedMethods.AHF) != 0 ? 4 : 1;
+			hf = (PresentMethods & UsedMethods.AHF3) != 0 ? 4 : 1;
 			cs = s;
 		}
 	}
@@ -203,40 +159,20 @@ internal partial class Compression
 	internal void Encode4(ref byte[] cs, ref int hf)
 	{
 		byte[] s;
-		List<List<ShortIntervalList>> tl1, ctl;
+		List<List<ShortIntervalList>> ctl;
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 7;
-		var isBWTApplicable = IsBWTApplicable();
-		Subtotal[tn] += ProgressBarStep;
-		if (!isBWTApplicable)
-			throw new EncoderFallbackException();
 		ctl = MakeWordsSplit((PresentMethods & UsedMethods.SHET4) != 0);
 		if (ctl.Length != 3)
 			throw new EncoderFallbackException();
 		Subtotal[tn] += ProgressBarStep;
 		ctl[1] = new(BWT(ctl[1], true));
 		Subtotal[tn] += ProgressBarStep;
-		if ((PresentMethods & UsedMethods.AHF) != 0)
-		{
-			s = AdaptiveHuffman(ctl, Array.Empty<LZData>());
-			Subtotal[tn] += ProgressBarStep;
-		}
-		else
-		{
-			tl1 = RedStarLinq.Fill(ctl.Length, _ => new List<ShortIntervalList>());
-			for (var i = 0; i < ctl.Length; i++)
-			{
-				tl1[i] = new(new Huffman(ctl[i], result, tn).Encode());
-				if (tl1[i].Length == 0)
-					throw new EncoderFallbackException();
-				Subtotal[tn] += ProgressBarStep;
-			}
-			s = WorkUpTripleList(tl1, tn);
-		}
+		s = new AdaptiveHuffman(tn).Encode(ctl, new LZData[ctl.Length]);
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < cs.Length && s.Length > 0)
 		{
-			hf = ((PresentMethods & UsedMethods.AHF) != 0 ? 4 : 1) + ((PresentMethods & UsedMethods.SHET2) != 0 ? 2 : 1);
+			hf = 4 + ((PresentMethods & UsedMethods.SHET2) != 0 ? 2 : 1);
 			cs = s;
 		}
 	}
@@ -289,17 +225,72 @@ internal partial class Compression
 	}
 }
 
-public static class Executions
+public record class Executions(byte[] OriginalFile)
 {
-	public static byte[] Encode(byte[] originalFile)
+	private readonly byte[][] s = RedStarLinq.FillArray(ProgressBarGroups, _ => OriginalFile);
+	private byte[] cs = OriginalFile;
+	private int hf = 0, bwt = 0, rle = 0, lz = 0, misc = 0, hfP1 = 0, lzP1 = 0, hfP2 = 0, lzP2 = 0, hfP3 = 0, hfP4 = 0, miscP5 = 0, miscP6 = 0, miscP7 = 0;
+
+	public byte[] Encode()
 	{
-		var s = RedStarLinq.FillArray(ProgressBarGroups, _ => originalFile);
-		var cs = originalFile;
 		Total = 0;
 		TotalMaximum = ProgressBarStep * 6;
-		int hf = 0, bwt = 0, rle = 0, lz = 0, misc = 0, hfP1 = 0, lzP1 = 0, hfP2 = 0, lzP2 = 0, hfP3 = 0, lzP3 = 0, hfP4 = 0, lzP4 = 0, miscP5 = 0, miscP6 = 0, miscP7 = 0;
-		var mainInput = new Compression(originalFile, new(), 0).PreEncode(ref rle, out var originalFile2);
+		var mainInput = new Compression(OriginalFile.ToNList(), new(), 0).PreEncode(ref rle, out var originalFile2);
 		Total += ProgressBarStep;
+		InitThreads(mainInput, originalFile2);
+		ProcessThreads();
+		if ((PresentMethods & UsedMethods.CS7) != 0 && s[6].Length < cs.Length && s[6].Length > 0 && s.GetSlice(0, 6).All(x => s[6].Length < x.Length))
+		{
+			misc = miscP7;
+			cs = s[6];
+		}
+		else if ((PresentMethods & UsedMethods.CS6) != 0 && s[5].Length < cs.Length && s[5].Length > 0 && s.GetSlice(0, 5).All(x => s[5].Length < x.Length))
+		{
+			misc = miscP6;
+			cs = s[5];
+		}
+		else if ((PresentMethods & UsedMethods.CS5) != 0 && s[4].Length < cs.Length && s[4].Length > 0 && s.GetSlice(0, 4).All(x => s[4].Length < x.Length))
+		{
+			misc = miscP5;
+			cs = s[4];
+		}
+		else if ((PresentMethods & UsedMethods.CS4) != 0 && s[3].Length < cs.Length && s[3].Length > 0 && s.GetSlice(0, 3).All(x => s[3].Length < x.Length))
+		{
+			hf = hfP4;
+			bwt = 42;
+			cs = s[3];
+		}
+		else if ((PresentMethods & UsedMethods.CS3) != 0 && s[2].Length < cs.Length && s[2].Length > 0 && s[2].Length < s[1].Length && s[2].Length < s[0].Length)
+		{
+			hf = hfP3;
+			bwt = 42;
+			cs = s[2];
+		}
+		else if ((PresentMethods & UsedMethods.CS2) != 0 && s[1].Length < cs.Length && s[1].Length > 0 && s[1].Length < s[0].Length)
+		{
+			hf = hfP2;
+			bwt = 0;
+			lz = lzP2;
+			cs = s[1];
+		}
+		else if ((PresentMethods & UsedMethods.CS1) != 0 && s[0].Length < cs.Length && s[0].Length > 0)
+		{
+			hf = hfP1;
+			bwt = 0;
+			lz = lzP1;
+			cs = s[0];
+		}
+		else
+			return new byte[] { (byte)rle }.Concat(originalFile2).ToArray();
+		var compressedFile = new[] { (byte)(misc + lz + bwt + rle + hf) }.Concat(cs).ToArray();
+#if DEBUG
+		Validate(compressedFile);
+#endif
+		return compressedFile;
+	}
+
+	private void InitThreads(List<ShortIntervalList> mainInput, NList<byte> originalFile2)
+	{
 		Threads[0] = new Thread(() =>
 		{
 			try
@@ -384,6 +375,10 @@ public static class Executions
 			}
 			Total += ProgressBarStep;
 		});
+	}
+
+	private static void ProcessThreads()
+	{
 		Threads[0].Name = "Процесс классического сжатия";
 		Threads[1].Name = "Процесс сжатия для слов";
 		Threads[2].Name = "Процесс сжатия с BWT";
@@ -402,65 +397,22 @@ public static class Executions
 		Thread.CurrentThread.Priority = ThreadPriority.Lowest;
 		Threads.ForEach(x => x?.Start());
 		Threads.ForEach(x => x?.Join());
-		if ((PresentMethods & UsedMethods.CS7) != 0 && s[6].Length < cs.Length && s[6].Length > 0 && s.GetSlice(0, 6).All(x => s[6].Length < x.Length))
-		{
-			misc = miscP7;
-			cs = s[6];
-		}
-		else if ((PresentMethods & UsedMethods.CS6) != 0 && s[5].Length < cs.Length && s[5].Length > 0 && s.GetSlice(0, 5).All(x => s[5].Length < x.Length))
-		{
-			misc = miscP6;
-			cs = s[5];
-		}
-		else if ((PresentMethods & UsedMethods.CS5) != 0 && s[4].Length < cs.Length && s[4].Length > 0 && s.GetSlice(0, 4).All(x => s[4].Length < x.Length))
-		{
-			misc = miscP5;
-			cs = s[4];
-		}
-		else if ((PresentMethods & UsedMethods.CS4) != 0 && s[3].Length < cs.Length && s[3].Length > 0 && s.GetSlice(0, 3).All(x => s[3].Length < x.Length))
-		{
-			hf = hfP4;
-			bwt = 42;
-			lz = lzP4;
-			cs = s[3];
-		}
-		else if ((PresentMethods & UsedMethods.CS3) != 0 && s[2].Length < cs.Length && s[2].Length > 0 && s[2].Length < s[1].Length && s[2].Length < s[0].Length)
-		{
-			hf = hfP3;
-			bwt = 42;
-			lz = lzP3;
-			cs = s[2];
-		}
-		else if ((PresentMethods & UsedMethods.CS2) != 0 && s[1].Length < cs.Length && s[1].Length > 0 && s[1].Length < s[0].Length)
-		{
-			hf = hfP2;
-			bwt = 0;
-			lz = lzP2;
-			cs = s[1];
-		}
-		else if ((PresentMethods & UsedMethods.CS1) != 0 && s[0].Length < cs.Length && s[0].Length > 0)
-		{
-			hf = hfP1;
-			bwt = 0;
-			lz = lzP1;
-			cs = s[0];
-		}
-		else
-			return new byte[] { 0 }.Concat(originalFile).ToArray();
-		var compressedFile = new[] { (byte)(misc + lz + bwt + rle + hf) }.Concat(cs).ToArray();
+	}
 #if DEBUG
+
+	private void Validate(byte[] compressedFile)
+	{
 		try
 		{
 			var decoded = Decoding.Decode(compressedFile, ProgramVersion);
-			for (var i = 0; i < originalFile.Length; i++)
-				if (originalFile[i] != decoded[i])
+			for (var i = 0; i < OriginalFile.Length; i++)
+				if (OriginalFile[i] != decoded[i])
 					throw new DecoderFallbackException();
 		}
-		catch
+		catch (Exception ex) when (ex is not DecoderFallbackException)
 		{
 			throw new DecoderFallbackException();
 		}
-#endif
-		return compressedFile;
 	}
+#endif
 }
