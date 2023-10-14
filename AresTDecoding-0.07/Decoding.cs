@@ -67,13 +67,11 @@ public static class Decoding
 		if (encodingVersion == 0)
 			return compressedFile;
 		else if (encodingVersion < ProgramVersion)
-		{
 			return encodingVersion switch
 			{
 				1 => AresTLib005.Decoding.Decode(compressedFile, encodingVersion),
 				_ => throw new DecoderFallbackException(),
 			};
-		}
 		int method = compressedFile[0];
 		if (method == 0)
 			return compressedFile[1..];
@@ -214,7 +212,7 @@ public static class Decoding
 				}
 				lzSpiralLength = (lzRSpiralLength, lzMaxSpiralLength, lzThresholdSpiralLength);
 			}
-			l0:
+		l0:
 			counter -= GetArrayLength(counter2, 8);
 		}
 		LZData lzData = (lzDist, lzLength, lzUseSpiralLengths, lzSpiralLength);

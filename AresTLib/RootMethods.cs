@@ -6,7 +6,6 @@ internal partial class Compression
 	private readonly NList<byte> originalFile;
 	private readonly List<ShortIntervalList> input, result = new();
 	private readonly int tn;
-	private const int LZDictionarySize = 8388607;
 
 	public Compression(NList<byte> originalFile, List<ShortIntervalList> input, int tn)
 	{
@@ -183,7 +182,7 @@ internal partial class Compression
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 4;
 		ArchaicHuffman(input);
-		s = LZMA(input);
+		s = new LZMA(tn).Encode(input);
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < originalFile.Length && s.Length > 0)
 		{
@@ -197,7 +196,7 @@ internal partial class Compression
 		byte[] s;
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 2;
-		s = PPM(input);
+		s = new PPM(tn).Encode(input);
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < originalFile.Length && s.Length > 0)
 		{
@@ -215,7 +214,7 @@ internal partial class Compression
 		if (ctl.Length == 0)
 			throw new EncoderFallbackException();
 		Subtotal[tn] += ProgressBarStep;
-		s = PPM(ctl);
+		s = new PPM(tn).Encode(ctl);
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < originalFile.Length && s.Length > 0)
 		{

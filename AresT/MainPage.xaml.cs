@@ -248,38 +248,9 @@ public partial class MainPage : ContentPage
 			if (message.Length == 0)
 				return;
 			if (message[0] == 0 && message.Length == ProgressBarGroups * 24 + 17 && is_working)
-			{
-				SetValue(ProgressBarSupertotal, (double)BitConverter.ToInt32(message.AsSpan(1, 4)) / BitConverter.ToInt32(message.AsSpan(5, 4)));
-				SetValue(ProgressBarTotal, (double)BitConverter.ToInt32(message.AsSpan(9, 4)) / BitConverter.ToInt32(message.AsSpan(13, 4)));
-				for (var i = 0; i < ProgressBarGroups; i++)
-				{
-					SetValue(ProgressBarSubtotal[i], (double)BitConverter.ToInt32(message.AsSpan(i * 24 + 17, 4)) / BitConverter.ToInt32(message.AsSpan(i * 24 + 21, 4)));
-					SetValue(ProgressBarCurrent[i], (double)BitConverter.ToInt32(message.AsSpan(i * 24 + 25, 4)) / BitConverter.ToInt32(message.AsSpan(i * 24 + 29, 4)));
-					SetValue(ProgressBarStatus[i], (double)BitConverter.ToInt32(message.AsSpan(i * 24 + 33, 4)) / BitConverter.ToInt32(message.AsSpan(i * 24 + 37, 4)));
-				}
-			}
+				UpdateProgressBars(message);
 			else if (message[0] == 1)
-			{
-				var timeString = "";
-#if !DEBUG
-				var elapsed = DateTime.Now - compressionStart;
-				timeString += " (" + (elapsed.Days == 0 ? "" : $"{elapsed.Days:D}:") + (elapsed.Days == 0 && elapsed.Hours == 0 ? "" : $"{elapsed.Hours:D2}:") + $"{elapsed.Minutes:D2}:{elapsed.Seconds:D2}.{elapsed.Milliseconds:D3})";
-#endif
-				if (operation_type == OperationType.Opening)
-				{
-					var path = (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\" + Path.GetFileNameWithoutExtension(filename);
-					using Process process = new();
-					process.StartInfo.FileName = "explorer";
-					process.StartInfo.Arguments = "\"" + path + "\"";
-					process.Start();
-					System.Threading.Thread.Sleep(MillisecondsPerSecond);
-					await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Файл успешно распакован" + timeString + "!", "ОК"));
-					process.WaitForExit();
-					File.Delete(path);
-				}
-				else
-					await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Файл успешно " + (operation_type is OperationType.Compression or OperationType.Recompression ? "сжат" : "распакован") + timeString + "!", "ОК"));
-			}
+				await OpenFile();
 			else if (message[0] == 2)
 				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Не удалось " + (operation_type is OperationType.Compression or OperationType.Recompression ? "сжать" : "распаковать") + " файл.", "ОК"));
 			else if (message[0] == 3)
@@ -296,6 +267,41 @@ public partial class MainPage : ContentPage
 		}
 	}
 
+	private void UpdateProgressBars(byte[] message)
+	{
+		SetValue(ProgressBarSupertotal, (double)BitConverter.ToInt32(message.AsSpan(1, 4)) / BitConverter.ToInt32(message.AsSpan(5, 4)));
+		SetValue(ProgressBarTotal, (double)BitConverter.ToInt32(message.AsSpan(9, 4)) / BitConverter.ToInt32(message.AsSpan(13, 4)));
+		for (var i = 0; i < ProgressBarGroups; i++)
+		{
+			SetValue(ProgressBarSubtotal[i], (double)BitConverter.ToInt32(message.AsSpan(i * 24 + 17, 4)) / BitConverter.ToInt32(message.AsSpan(i * 24 + 21, 4)));
+			SetValue(ProgressBarCurrent[i], (double)BitConverter.ToInt32(message.AsSpan(i * 24 + 25, 4)) / BitConverter.ToInt32(message.AsSpan(i * 24 + 29, 4)));
+			SetValue(ProgressBarStatus[i], (double)BitConverter.ToInt32(message.AsSpan(i * 24 + 33, 4)) / BitConverter.ToInt32(message.AsSpan(i * 24 + 37, 4)));
+		}
+	}
+
+	private async Task OpenFile()
+	{
+		var timeString = "";
+#if !DEBUG
+				var elapsed = DateTime.Now - compressionStart;
+				timeString += " (" + (elapsed.Days == 0 ? "" : $"{elapsed.Days:D}:") + (elapsed.Days == 0 && elapsed.Hours == 0 ? "" : $"{elapsed.Hours:D2}:") + $"{elapsed.Minutes:D2}:{elapsed.Seconds:D2}.{elapsed.Milliseconds:D3})";
+#endif
+		if (operation_type == OperationType.Opening)
+		{
+			var path = (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\" + Path.GetFileNameWithoutExtension(filename);
+			using Process process = new();
+			process.StartInfo.FileName = "explorer";
+			process.StartInfo.Arguments = "\"" + path + "\"";
+			process.Start();
+			System.Threading.Thread.Sleep(MillisecondsPerSecond);
+			await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Файл успешно распакован" + timeString + "!", "ОК"));
+			process.WaitForExit();
+			File.Delete(path);
+		}
+		else
+			await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Файл успешно " + (operation_type is OperationType.Compression or OperationType.Recompression ? "сжат" : "распакован") + timeString + "!", "ОК"));
+	}
+
 	private void Thread() => Thread(false);
 
 	private async void Thread(bool startImmediate)
@@ -309,76 +315,28 @@ public partial class MainPage : ContentPage
 			{
 				if (startImmediate)
 					InitProgressBars();
-				is_working = true;
-				SendMessageToClient(0, Encoding.UTF8.GetBytes(filename).Prepend((byte)1).ToArray());
-#if !DEBUG
-				compressionStart = DateTime.Now;
-#endif
-			}
-			catch (OperationCanceledException)
-			{
 			}
 			catch
 			{
 				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Не удалось распаковать файл.", "ОК"));
+				break;
 			}
+			await StartProcess(true);
 			break;
 			case OperationType.Compression:
 			if (ProcessStartup("").Result is bool)
 				return;
-			try
-			{
-				is_working = true;
-				SendMessageToClient(0, Encoding.UTF8.GetBytes(filename).Prepend((byte)2).ToArray());
-#if !DEBUG
-				compressionStart = DateTime.Now;
-#endif
-			}
-			catch (OperationCanceledException)
-			{
-			}
-			catch
-			{
-				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Не удалось сжать файл.", "ОК"));
-			}
+			await StartProcess(false);
 			break;
 			case OperationType.Unpacking:
 			if (ProcessStartup(".ares-t").Result is bool)
 				return;
-			try
-			{
-				is_working = true;
-				SendMessageToClient(0, Encoding.UTF8.GetBytes(filename).Prepend((byte)3).ToArray());
-#if !DEBUG
-				compressionStart = DateTime.Now;
-#endif
-			}
-			catch (OperationCanceledException)
-			{
-			}
-			catch
-			{
-				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Не удалось распаковать файл.", "ОК"));
-			}
+			await StartProcess(true);
 			break;
 			case OperationType.Recompression:
 			if (ProcessStartup(".ares-t").Result is bool)
 				return;
-			try
-			{
-				is_working = true;
-				SendMessageToClient(0, Encoding.UTF8.GetBytes(filename).Prepend((byte)4).ToArray());
-#if !DEBUG
-				compressionStart = DateTime.Now;
-#endif
-			}
-			catch (OperationCanceledException)
-			{
-			}
-			catch
-			{
-				await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Не удалось сжать файл.", "ОК"));
-			}
+			await StartProcess(false);
 			break;
 		}
 	}
@@ -453,6 +411,25 @@ public partial class MainPage : ContentPage
 		PickerQuickSetup.IsEnabled = isEnabled;
 		GridSettings.IsEnabled = isEnabled;
 		return 0;
+	}
+
+	private async Task StartProcess(bool unpack)
+	{
+		try
+		{
+			is_working = true;
+			SendMessageToClient(0, Encoding.UTF8.GetBytes(filename).Prepend((byte)(operation_type + 1)).ToArray());
+#if !DEBUG
+				compressionStart = DateTime.Now;
+#endif
+		}
+		catch (OperationCanceledException)
+		{
+		}
+		catch
+		{
+			await MainThread.InvokeOnMainThreadAsync(async () => await DisplayAlert("", "Ошибка! Не удалось " + (unpack ? "распаковать" : "сжать") + " файл.", "ОК"));
+		}
 	}
 
 	private void ButtonOpen_Click(object? sender, EventArgs e)
