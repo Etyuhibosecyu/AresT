@@ -30,6 +30,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AresGlobalDecoding-0.07", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AresTDecoding-0.07", "AresTDecoding-0.07\AresTDecoding-0.07.csproj", "{A1C1CEA7-1807-4168-A54C-6E6590171BD6}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AresTDecoding-0.09", "AresTDecoding-0.09\AresTDecoding-0.09.csproj", "{EC5D5A48-9104-4FD5-A6DA-EC460A60F5A5}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mpir.NET", "..\Corlib.NStar\Mpir.NET\Mpir.NET.csproj", "{46445AD7-52C5-4A52-854D-56BD3D15D926}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AresGlobalDecoding-0.075", "..\AresGlobal\AresGlobalDecoding-0.075\AresGlobalDecoding-0.075.csproj", "{B0D252CC-3823-473F-BE90-888CC9955919}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -82,6 +88,18 @@ Global
 		{A1C1CEA7-1807-4168-A54C-6E6590171BD6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1C1CEA7-1807-4168-A54C-6E6590171BD6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1C1CEA7-1807-4168-A54C-6E6590171BD6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EC5D5A48-9104-4FD5-A6DA-EC460A60F5A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EC5D5A48-9104-4FD5-A6DA-EC460A60F5A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EC5D5A48-9104-4FD5-A6DA-EC460A60F5A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EC5D5A48-9104-4FD5-A6DA-EC460A60F5A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{46445AD7-52C5-4A52-854D-56BD3D15D926}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{46445AD7-52C5-4A52-854D-56BD3D15D926}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{46445AD7-52C5-4A52-854D-56BD3D15D926}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{46445AD7-52C5-4A52-854D-56BD3D15D926}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0D252CC-3823-473F-BE90-888CC9955919}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0D252CC-3823-473F-BE90-888CC9955919}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0D252CC-3823-473F-BE90-888CC9955919}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0D252CC-3823-473F-BE90-888CC9955919}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
