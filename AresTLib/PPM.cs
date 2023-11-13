@@ -3,16 +3,60 @@ namespace AresTLib;
 
 internal record class PPM(int TN)
 {
-	private const int LZDictionarySize = 8388607;
 	private ArithmeticEncoder ar = default!;
-	private readonly List<ShortIntervalList> input = new();
-	private int startPos = 1, n = 1;
+	private readonly List<List<Interval>> result = new();
+	private int doubleListsCompleted = 0;
+	private readonly object lockObj = new();
+
+	public byte[] Encode(List<ShortIntervalList> input)
+	{
+		if (input.Length < 4)
+			throw new EncoderFallbackException();
+		ar = new();
+		result.Replace(new List<List<Interval>>(new List<Interval>()));
+		if (!new PPMInternal(input, result[0], 1, true, TN).Encode())
+			throw new EncoderFallbackException();
+		result[0].ForEach(x => ar.WritePart(x.Lower, x.Length, x.Base));
+		ar.WriteEqual(1234567890, 4294967295);
+		return ar;
+	}
+
+	public byte[] Encode(List<List<ShortIntervalList>> input)
+	{
+		if (!(input.Length >= 3 && input.GetSlice(..3).All(x => x.Length >= 4)))
+			throw new EncoderFallbackException();
+		Current[TN] = 0;
+		CurrentMaximum[TN] = ProgressBarStep * (WordsListActualParts - 1);
+		ar = new();
+		result.Replace(RedStarLinq.FillArray(WordsListActualParts, _ => new List<Interval>()));
+		Parallel.For(0, WordsListActualParts, i =>
+		{
+			if (!new PPMInternal(input[i], result[i], i, i == WordsListActualParts - 1, TN).Encode())
+				throw new EncoderFallbackException();
+			lock (lockObj)
+			{
+				doubleListsCompleted++;
+				if (doubleListsCompleted != WordsListActualParts)
+					Current[TN] += ProgressBarStep;
+			}
+		});
+		result.ForEach(l => l.ForEach(x => ar.WritePart(x.Lower, x.Length, x.Base)));
+		input.GetSlice(WordsListActualParts).ForEach(dl => dl.ForEach(l => l.ForEach(x => ar.WritePart(x.Lower, x.Length, x.Base))));
+		ar.WriteEqual(1234567890, 4294967295);
+		return ar;
+	}
+}
+
+file record class PPMInternal(List<ShortIntervalList> Input, List<Interval> Result, int N, bool LastDoubleList, int TN)
+{
+	private const int LZDictionarySize = 8388607;
+	private int startPos = 1;
 	private readonly SumSet<uint> globalSet = new(), newItemsSet = new();
 	private const int maxDepth = 12;
 	private readonly LimitedQueue<List<Interval>> buffer = new(maxDepth);
 	private G.IEqualityComparer<NList<uint>> comparer = default!;
 	private FastDelHashSet<NList<uint>> contextHS = default!;
-	private HashList<NList<uint>> lzhl = default!;
+	private HashList<int> lzhl = default!;
 	private readonly List<SumSet<uint>> sumSets = new();
 	private readonly SumList lzLengthsSL = new();
 	private uint lzCount, notLZCount, spaceCount, notSpaceCount;
@@ -20,64 +64,36 @@ internal record class PPM(int TN)
 	private readonly LimitedQueue<uint> newItemsBuffer = new(maxDepth);
 	private readonly NList<uint> context = new(maxDepth), context2 = new(maxDepth);
 	private readonly SumSet<uint> set = new(), excludingSet = new();
+	private SumSet<uint> set2 = new();
 	private readonly List<Interval> intervalsForBuffer = new();
 	private int nextTarget = 0;
 
-	public byte[] Encode(List<ShortIntervalList> input)
+	public bool Encode()
 	{
-		if (input.Length < 4)
+		if (!(Input.Length >= 4 && Input[CreateVar(Input[0].Length >= 1 && Input[0][0] == LengthsApplied ? (int)Input[0][1].Base + 1 : 1, out startPos)].Length is 1 or 2 && Input[startPos][0].Length == 1 && CreateVar(Input[startPos][0].Base, out var inputBase) >= 2 && Input[startPos][^1].Length == 1 && Input.GetSlice(startPos + 1).All(x => x.Length == Input[startPos].Length && x[0].Length == 1 && x[0].Base == inputBase && (x.Length == 1 || x[1].Length == 1 && x[1].Base == Input[startPos][1].Base))))
 			throw new EncoderFallbackException();
-		ar = new();
-		this.input.Replace(input);
-		if (!PPMInternal())
-			throw new EncoderFallbackException();
-		ar.WriteEqual(1234567890, 4294967295);
-		return ar;
-	}
-
-	public byte[] Encode(List<List<ShortIntervalList>> input)
-	{
-		if (!(input.Length == 3 && input.All(x => x.Length >= 4)))
-			throw new EncoderFallbackException();
-		Current[TN] = 0;
-		CurrentMaximum[TN] = ProgressBarStep * 2;
-		ar = new();
-		for (var i = 0; i < input.Length; i++)
+		if (LastDoubleList)
 		{
-			this.input.Replace(input[i]);
-			n = i;
-			if (!PPMInternal())
-				throw new EncoderFallbackException();
-			if (i != input.Length - 1)
-				Current[TN] += ProgressBarStep;
+			Status[TN] = 0;
+			StatusMaximum[TN] = Input.Length - startPos;
 		}
-		ar.WriteEqual(1234567890, 4294967295);
-		return ar;
-	}
-
-	private bool PPMInternal()
-	{
-		if (!(input.Length >= 4 && input[CreateVar(input[0].Length >= 1 && input[0][0] == LengthsApplied ? (int)input[0][1].Base + 1 : 1, out startPos)].Length is 1 or 2 && input[startPos][0].Length == 1 && CreateVar(input[startPos][0].Base, out var inputBase) >= 2 && input[startPos][^1].Length == 1 && input.GetSlice(startPos + 1).All(x => x.Length == input[startPos].Length && x[0].Length == 1 && x[0].Base == inputBase && (x.Length == 1 || x[1].Length == 1 && x[1].Base == input[startPos][1].Base))))
-			throw new EncoderFallbackException();
-		Status[TN] = 0;
-		StatusMaximum[TN] = input.Length - startPos;
-		for (var i = 0; i < input[0].Length; i++)
-			ar.WritePart(input[0][i].Lower, input[0][i].Length, input[0][i].Base);
-		if (n == 0)
+		for (var i = 0; i < Input[0].Length; i++)
+			Result.Add(new(Input[0][i].Lower, Input[0][i].Length, Input[0][i].Base));
+		if (N == 0)
 		{
-			ar.WritePart(input[1][0].Lower, 1, 3);
-			ar.WriteCount(inputBase);
+			Result.Add(new(Input[1][0].Lower, 1, 3));
+			Result.WriteCount(inputBase);
 			for (var i = 2; i < startPos; i++)
-				for (var j = 0; j < input[i].Length; j++)
-					ar.WritePart(input[i][j].Lower, input[i][j].Length, input[i][j].Base);
+				for (var j = 0; j < Input[i].Length; j++)
+					Result.Add(new(Input[i][j].Lower, Input[i][j].Length, Input[i][j].Base));
 		}
-		ar.WriteCount((uint)(input.Length - startPos));
-		ar.WriteCount((uint)Min(LZDictionarySize, FragmentLength));
+		Result.WriteCount((uint)(Input.Length - startPos));
+		Result.WriteCount((uint)Min(LZDictionarySize, FragmentLength));
 		PrepareFields(inputBase);
-		for (var i = startPos; i < input.Length; i++, Status[TN]++)
+		for (var i = startPos; i < Input.Length; i++, _ = LastDoubleList ? Status[TN]++ : 0)
 		{
-			var item = input[i][0].Lower;
-			input.GetSlice(Max(startPos, i - maxDepth)..i).ForEach((x, index) => context.SetOrAdd(index, x[0].Lower));
+			var item = Input[i][0].Lower;
+			Input.GetSlice(Max(startPos, i - maxDepth)..i).ForEach((x, index) => context.SetOrAdd(index, x[0].Lower));
 			context.Reverse();
 			context2.Replace(context);
 			if (i < nextTarget)
@@ -91,26 +107,27 @@ internal record class PPM(int TN)
 			ProcessFrequency(item, ref sum, ref frequency);
 			ProcessBuffers(i);
 		l1:
-			if (context2.Length == maxDepth)
-				lzhl.SetOrAdd((i - startPos - maxDepth) % LZDictionarySize, context2.Copy());
-			Increase(context2, context, item);
+			var contextLength = context2.Length;
+			Increase(context2, context, item, out var hlIndex);
+			if (contextLength == maxDepth)
+				lzhl.SetOrAdd((i - startPos - maxDepth) % LZDictionarySize, hlIndex);
 		}
 		while (buffer.Length != 0)
-			buffer.Dequeue().ForEach(x => ar.WritePart(x.Lower, x.Length, x.Base));
+			buffer.Dequeue().ForEach(x => Result.Add(new(x.Lower, x.Length, x.Base)));
 		return true;
 	}
 
 	private void PrepareFields(uint inputBase)
 	{
 		globalSet.Clear();
-		if (n == 2)
+		if (N == 2)
 			newItemsSet.Clear();
 		else
 			newItemsSet.Replace(new Chain((int)inputBase).Convert(x => ((uint)x, 1)));
 		buffer.Clear();
-		comparer = n == 2 ? new NListEComparer<uint>() : new EComparer<NList<uint>>((x, y) => x.Equals(y), x => (int)x.Progression((uint)x.Length, (x, y) => (x << 7 | x >> BitsPerInt - 7) ^ (uint)y.GetHashCode()));
+		comparer = N == 2 ? new NListEComparer<uint>() : new EComparer<NList<uint>>((x, y) => x.Equals(y), x => (int)x.Progression((uint)x.Length, (x, y) => (x << 7 | x >> BitsPerInt - 7) ^ (uint)y.GetHashCode()));
 		contextHS = new(comparer);
-		lzhl = new(comparer);
+		lzhl = new();
 		sumSets.Clear();
 		lzLengthsSL.Replace(new[] { 1 });
 		lzCount = notLZCount = spaceCount = notSpaceCount = 1;
@@ -133,18 +150,23 @@ internal record class PPM(int TN)
 			if (set.Length != 0)
 				intervalsForBuffer.Add(new((uint)set.ValuesSum, (uint)set.Length * 100, (uint)(set.ValuesSum + set.Length * 100)));
 		if (set.Length == 0 || context.Length == 0)
-			set.Replace(globalSet).ExceptWith(excludingSet);
+		{
+			excludingSet.ForEach(x => excludingSet.Update(x.Key, globalSet.TryGetValue(x.Key, out var newValue) ? newValue : throw new EncoderFallbackException()));
+			set2 = globalSet.ExceptWith(excludingSet);
+		}
+		else
+			set2 = set;
 	}
 
 	private void ProcessFrequency(uint item, ref long sum, ref int frequency)
 	{
 		if (frequency == 0)
-			sum = set.GetLeftValuesSum(item, out frequency);
+			sum = set2.GetLeftValuesSum(item, out frequency);
 		if (frequency == 0)
 		{
-			if (set.Length != 0)
-				intervalsForBuffer.Add(new((uint)set.ValuesSum, (uint)set.Length * 100, (uint)(set.ValuesSum + set.Length * 100)));
-			if (n != 2)
+			if (set2.Length != 0)
+				intervalsForBuffer.Add(new((uint)set2.ValuesSum, (uint)set2.Length * 100, (uint)(set2.ValuesSum + set2.Length * 100)));
+			if (N != 2)
 			{
 				intervalsForBuffer.Add(new((uint)newItemsSet.IndexOf(item), (uint)newItemsSet.Length));
 				newItemsSet.RemoveValue(item);
@@ -153,28 +175,30 @@ internal record class PPM(int TN)
 		}
 		else
 		{
-			intervalsForBuffer.Add(new(0, (uint)set.ValuesSum, (uint)(set.ValuesSum + set.Length * 100)));
-			intervalsForBuffer.Add(new((uint)sum, (uint)frequency, (uint)set.ValuesSum));
+			intervalsForBuffer.Add(new(0, (uint)set2.ValuesSum, (uint)(set2.ValuesSum + set2.Length * 100)));
+			intervalsForBuffer.Add(new((uint)sum, (uint)frequency, (uint)set2.ValuesSum));
 			newItemsBuffer.Enqueue(uint.MaxValue);
 		}
+		if (set.Length == 0 || context.Length == 0)
+			globalSet.UnionWith(excludingSet);
 	}
 
 	private void ProcessBuffers(int i)
 	{
 		var isSpace = false;
-		if (n == 2)
+		if (N == 2)
 		{
-			isSpace = input[i][1].Lower != 0;
+			isSpace = Input[i][1].Lower != 0;
 			uint bufferSpaces = (uint)spaceBuffer.Count(true), bufferNotSpaces = (uint)spaceBuffer.Count(false);
 			intervalsForBuffer.Add(new(isSpace ? notSpaceCount + bufferNotSpaces : 0, isSpace ? spaceCount + bufferSpaces : notSpaceCount + bufferNotSpaces, notSpaceCount + spaceCount + (uint)spaceBuffer.Length));
 		}
 		else
-			for (var j = 1; j < input[i].Length; j++)
-				intervalsForBuffer.Add(new(input[i][j].Lower, input[i][j].Length, input[i][j].Base));
+			for (var j = 1; j < Input[i].Length; j++)
+				intervalsForBuffer.Add(new(Input[i][j].Lower, Input[i][j].Length, Input[i][j].Base));
 		if (buffer.IsFull)
-			buffer.Dequeue().ForEach(x => ar.WritePart(x.Lower, x.Length, x.Base));
+			buffer.Dequeue().ForEach(x => Result.Add(new(x.Lower, x.Length, x.Base)));
 		buffer.Enqueue(intervalsForBuffer.Copy());
-		if (n == 2 && spaceBuffer.IsFull)
+		if (N == 2 && spaceBuffer.IsFull)
 		{
 			var space2 = spaceBuffer.Dequeue();
 			if (space2)
@@ -191,11 +215,12 @@ internal record class PPM(int TN)
 			return false;
 		var bestDist = -1;
 		var bestLength = -1;
-		foreach (var pos in lzhl.IndexesOf(context))
+		var contextIndex = contextHS.IndexOf(context);
+		foreach (var pos in lzhl.IndexesOf(contextIndex))
 		{
 			var dist = (pos - (curPos - startPos - maxDepth)) % LZDictionarySize + curPos - startPos - maxDepth;
 			int length;
-			for (length = -maxDepth; length < input.Length - startPos - curPos && RedStarLinq.Equals(input[curPos + length], input[dist + maxDepth + startPos + length], (x, y) => x.Lower == y.Lower); length++) ;
+			for (length = -maxDepth; length < Input.Length - startPos - curPos && RedStarLinq.Equals(Input[curPos + length], Input[dist + maxDepth + startPos + length], (x, y) => x.Lower == y.Lower); length++) ;
 			if (curPos - (dist + maxDepth + startPos) >= 2 && length > bestLength)
 			{
 				bestDist = dist;
@@ -206,43 +231,51 @@ internal record class PPM(int TN)
 		{
 			if (buffer.IsFull)
 			{
-				ar.WritePart(0, notLZCount, lzCount + notLZCount);
+				Result.Add(new(0, notLZCount, lzCount + notLZCount));
 				notLZCount++;
 			}
 			return false;
 		}
-		ar.WritePart(notLZCount, lzCount, lzCount + notLZCount);
+		Result.Add(new(notLZCount, lzCount, lzCount + notLZCount));
 		lzCount++;
-		ar.WriteEqual((uint)(curPos - (bestDist + maxDepth + startPos) - 2), (uint)Min(curPos - startPos - maxDepth, LZDictionarySize - 1));
+		Result.Add(new((uint)(curPos - (bestDist + maxDepth + startPos) - 2), (uint)Min(curPos - startPos - maxDepth, LZDictionarySize - 1)));
 		if (bestLength < lzLengthsSL.Length - 1)
 		{
-			ar.WritePart((uint)lzLengthsSL.GetLeftValuesSum(bestLength, out var frequency), (uint)frequency, (uint)lzLengthsSL.ValuesSum);
+			Result.Add(new((uint)lzLengthsSL.GetLeftValuesSum(bestLength, out var frequency), (uint)frequency, (uint)lzLengthsSL.ValuesSum));
 			lzLengthsSL.Increase(bestLength);
 		}
 		else
 		{
-			ar.WritePart((uint)(lzLengthsSL.ValuesSum - lzLengthsSL[^1]), (uint)lzLengthsSL[^1], (uint)lzLengthsSL.ValuesSum);
+			Result.Add(new((uint)(lzLengthsSL.ValuesSum - lzLengthsSL[^1]), (uint)lzLengthsSL[^1], (uint)lzLengthsSL.ValuesSum));
 			lzLengthsSL.Increase(lzLengthsSL.Length - 1);
-			ar.WriteFibonacci((uint)(bestLength - lzLengthsSL.Length + 2));
+			foreach (var bit in EncodeFibonacci((uint)(bestLength - lzLengthsSL.Length + 2)))
+				Result.Add(new(bit ? 1u : 0, 2));
 			new Chain(bestLength - lzLengthsSL.Length + 1).ForEach(x => lzLengthsSL.Insert(lzLengthsSL.Length - 1, 1));
 		}
 		buffer.Clear();
 		spaceBuffer.Clear();
-		if (n != 2)
+		if (N != 2)
 			newItemsBuffer.Filter(x => x != uint.MaxValue).ForEach(x => newItemsSet.Add((x, 1)));
 		newItemsBuffer.Clear();
 		nextTarget = curPos + bestLength;
 		return true;
 	}
 
-	void Increase(NList<uint> context, NList<uint> successContext, uint item)
+	void Increase(NList<uint> context, NList<uint> successContext, uint item, out int outIndex)
 	{
+		outIndex = -1;
 		for (; context.Length > 0 && contextHS.TryAdd(context.Copy(), out var index); context.RemoveAt(^1))
+		{
+			if (outIndex == -1)
+				outIndex = index;
 			sumSets.SetOrAdd(index, new() { (item, 100) });
+		}
 		var successLength = context.Length;
 		_ = context.Length == 0 ? null : successContext.Replace(context).RemoveAt(^1);
 		for (; context.Length > 0 && contextHS.TryGetIndexOf(context, out var index); context.RemoveAt(^1), _ = context.Length == 0 ? null : successContext.RemoveAt(^1))
 		{
+			if (outIndex == -1)
+				outIndex = index;
 			if (!sumSets[index].TryGetValue(item, out var itemValue))
 			{
 				sumSets[index].Add(item, 100);

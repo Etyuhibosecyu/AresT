@@ -595,4 +595,7 @@ public static class Decoding
 		var read = ar.ReadEqual((uint)1 << Max(temp, 1));
 		return read + ((temp == 0) ? 0 : (uint)1 << Max(temp, 1));
 	}
+
+	private static uint GetBaseWithBuffer(uint oldBase) => oldBase + GetBufferInterval(oldBase);
+	private static uint GetBufferInterval(uint oldBase) => Max((oldBase + 10) / 20, 1);
 }

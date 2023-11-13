@@ -2,6 +2,7 @@
 namespace AresTLib;
 internal record class LZMA(int TN)
 {
+	private readonly int threadsCount = Environment.ProcessorCount;
 
 	public byte[] Encode(List<ShortIntervalList> input)
 	{
@@ -15,9 +16,9 @@ internal record class LZMA(int TN)
 	{
 		Current[TN] = 0;
 		CurrentMaximum[TN] = ProgressBarStep * 2;
-		var indexCodes = RedStarLinq.PNFill(bitList.Length - 23, index => bitList.GetSmallRange(index, 24)).PGroup(TN).Filter(X => X.Group.Length >= 2).NSort(x => x.Key).PToArray(col => col.Group.Sort());
+		var indexCodes = RedStarLinq.PNFill(bitList.Length - 23, index => bitList.GetSmallRange(index, 24)).PGroup(TN).Filter(X => X.Group.Length >= 2).NSort(x => x.Key).PToArray(col => col.Group.NSort());
 		var startKGlobal = 24;
-		Dictionary<uint, (uint dist, uint length, uint spiralLength)> repeatsInfo = new();
+		var repeatsInfo = RedStarLinq.FillArray(threadsCount, _ => new Dictionary<uint, (uint dist, uint length, uint spiralLength)>());
 		Status[TN] = 0;
 		StatusMaximum[TN] = indexCodes.Sum(x => x.Length);
 		Current[TN] += ProgressBarStep;
@@ -25,11 +26,12 @@ internal record class LZMA(int TN)
 		Dictionary<int, int> maxReachedLengths = new();
 		uint useSpiralLengths = 0;
 		var maxLevel = Max(BitsCount(LZDictionarySize * BitsPerByte) / 2 - 5, 0);
-		object lockObj = new();
+		var lockObj = RedStarLinq.FillArray(threadsCount, _ => new object());
 		Parallel.ForEach(indexCodes, x => FindMatchesRecursive(x, 0));
 		var (blockStartValue, blockEscapeValue, bitsCount, blockStartIndexes) = LZMABlockStart(bitList);
 		var blockStart = new BitList(bitsCount, blockStartValue).Convert(x => new ShortIntervalList() { new(x ? 1u : 0, 2) });
-		LZRequisites(bitList.Length, BitsPerByte, repeatsInfo, out var boundIndex, out var repeatsInfoList2, out var starts, out var dists, out var lengths, out var spiralLengths, out var maxDist, out var maxLength, out var maxSpiralLength, out var rDist, out var thresholdDist, out var rLength, out var thresholdLength, out var rSpiralLength, out var thresholdSpiralLength, PrimitiveType.UIntType);
+		var repeatsInfoSum = repeatsInfo.JoinIntoSingle().ToDictionary();
+		LZRequisites(bitList.Length, BitsPerByte, repeatsInfoSum, out var boundIndex, out var repeatsInfoList2, out var starts, out var dists, out var lengths, out var spiralLengths, out var maxDist, out var maxLength, out var maxSpiralLength, out var rDist, out var thresholdDist, out var rLength, out var thresholdLength, out var rSpiralLength, out var thresholdSpiralLength, PrimitiveType.UIntType);
 		var result = bitList.Convert(x => new ShortIntervalList() { new(x ? 1u : 0, 2) });
 		Status[TN] = 0;
 		StatusMaximum[TN] = starts.Length;
@@ -99,7 +101,7 @@ internal record class LZMA(int TN)
 		{
 			if (level < maxLevel)
 			{
-				var nextCodes = ic.GetSlice(..Max(ic.FindLastIndex(x => x <= bitList.Length - level * BitsPerByte - startKGlobal), 0)).GroupIndexes(iIC => bitList.GetSmallRange((int)iIC + startKGlobal, BitsPerByte)).FilterInPlace(x => x.Length >= 2).Convert(x => x.ToArray(index => ic[index]).Sort());
+				var nextCodes = ic.GetSlice(..Max(ic.FindLastIndex(x => x <= bitList.Length - level * BitsPerByte - startKGlobal), 0)).GroupIndexes(iIC => bitList.GetSmallRange((int)iIC + startKGlobal, BitsPerByte)).FilterInPlace(x => x.Length >= 2).Convert(x => x.ToArray(index => ic[index]).NSort());
 				var nextCodes2 = nextCodes.JoinIntoSingle().ToHashSet();
 				ic = ic.Filter(x => !nextCodes2.Contains(x)).ToArray();
 				nextCodes.ForEach(x => FindMatchesRecursive(x, level + 1));
@@ -135,7 +137,7 @@ internal record class LZMA(int TN)
 				if (k * Log(2) < Log(21) + Log(LZDictionarySize * BitsPerByte) + Log(k))
 					continue;
 				var sl = (ushort)Clamp(k / (iIC - lastMatch) - 1, 0, ushort.MaxValue);
-				UpdateRepeatsInfo(repeatsInfo, lockObj, iIC, 0, (uint)Max(iIC - lastMatch - k, 0), (uint)Min(k - 2, iIC - lastMatch - 2), sl, PrimitiveType.UIntType);
+				UpdateRepeatsInfo(repeatsInfo, lockObj, threadsCount, iIC, (uint)Max(iIC - lastMatch - k, 0), (uint)Min(k - 2, iIC - lastMatch - 2), sl, PrimitiveType.UIntType);
 				if (sl > 0)
 					useSpiralLengths = 1;
 				if (k > ub || sl == ushort.MaxValue)

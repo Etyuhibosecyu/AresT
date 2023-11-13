@@ -7,13 +7,13 @@ internal partial class Compression
 	{
 		Current[tn] = 0;
 		CurrentMaximum[tn] = ProgressBarStep * 3;
-		var s = AdaptEncoding(out var encoding, out var nulls);
+		var s = AdaptEncoding(out var encoding, out var nulls, out var redundantByte);
 		if (s == "")
 			throw new EncoderFallbackException();
 		var encoding2 = (encoding == 1) ? Encoding.Unicode : (encoding == 2) ? Encoding.UTF8 : Encoding.GetEncoding(1251);
 		Current[tn] += ProgressBarStep;
 		if (shet)
-			s = SHET(s, ('\x99', '\x7F'));
+			s = SHET(s, ('\x14', '\x7F'));
 		Current[tn] += ProgressBarStep;
 		var words = DivideIntoWords(s);
 		if (words.Length < 5)
@@ -24,6 +24,8 @@ internal partial class Compression
 		var wordsWithoutSpaces = words.PConvert(x => new Word(x.String, false));
 		Status[tn]++;
 		var uniqueWords = wordsWithoutSpaces.ToHashSet().ToArray();
+		if (uniqueWords.Any(x => x.String.Contains(' ')))
+			throw new EncoderFallbackException();
 		if (words.Length < uniqueWords.Length * 3)
 			throw new EncoderFallbackException();
 		var uniqueWords2 = uniqueWords.PConvert(x => encoding2.GetBytes(x.String));
@@ -49,6 +51,16 @@ internal partial class Compression
 		Status[tn]++;
 		result.Add(indexCodes.PConvert((x, index) => uniqueLists[x][words[index].Space ? 1 : 0]));
 		Status[tn]++;
+		if (encoding == 2)
+		{
+			if (redundantByte == null)
+				result.Add(new() { new() { new(0, 2) } });
+			else
+			{
+				result.Add(new() { new() { new(1, 2) } });
+				result[^1][^1].Add(new(redundantByte.Value, ValuesInByte));
+			}
+		}
 		List<Interval> nullIntervals = new();
 		nullIntervals.WriteCount((uint)nulls.Length, (uint)BitsCount(FragmentLength));
 		for (var i = 0; i < nulls.Length; i++)
@@ -60,20 +72,32 @@ internal partial class Compression
 		result[1].Insert(0, new ShortIntervalList());
 		result[2].Insert(0, new ShortIntervalList() { WordsApplied, SpacesApplied });
 #if DEBUG
-		if (!RedStarLinq.Equals(originalFile.Filter((x, index) => !nulls.Contains(index) && (encoding == 0 || !nulls.Contains(index - 1))).ToArray(), result.Wrap(tl =>
+		try
 		{
-			var a = 0;
-			var wordsList = tl[0].GetSlice(GetArrayLength(nullIntervals.Length, 8) + 2).Convert(l => encoding2.GetString(tl[1].GetSlice(1)[a..(a += (int)l[0].Lower)].ToArray(x => (byte)x[0].Lower)));
-			return encoding2.GetBytes(tl[2].GetSlice(1).ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => l[1].Lower == 1 ? new List<char>(x).Add(' ') : x.ToList())).ToArray());
-		})))
-			throw new InvalidOperationException();
+			var original = originalFile.Filter((x, index) => !nulls.Contains(index) && (encoding == 0 || !nulls.Contains(index - 1))).ToArray();
+			var decoded = result.Wrap(tl =>
+			{
+				var a = 0;
+				var wordsList = tl[0].GetSlice(GetArrayLength(nullIntervals.Length, 8) + 2).Convert(l => encoding2.GetString(tl[1].GetSlice(1)[a..(a += (int)l[0].Lower)].ToArray(x => (byte)x[0].Lower)));
+				return encoding2.GetBytes(tl[2].GetSlice(1).ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => l[1].Lower == 1 ? new List<char>(x).Add(' ') : x.ToList())).DecodeSHET(shet)).Wrap(bl => encoding == 2 && tl[3][0][0].Lower == 1 ? bl.ToNList().Add((byte)tl[3][0][1].Lower) : bl.ToNList());
+			});
+			for (var i = 0; i < original.Length; i++)
+				if (original[i] != decoded[i])
+					throw new DecoderFallbackException();
+		}
+		catch (Exception ex) when (ex is not DecoderFallbackException)
+		{
+			throw new DecoderFallbackException();
+		}
 #endif
 		return result;
 	}
 
-	private string AdaptEncoding(out uint encoding, out ListHashSet<int> nulls)
+	private string AdaptEncoding(out uint encoding, out ListHashSet<int> nulls, out byte? redundantByte)
 	{
-		int ansiLetters = 0, utf16Letters = 0, utf8Letters = 0;
+		redundantByte = null;
+		var threadsCount = Environment.ProcessorCount;
+		int[] ansiLetters = new int[threadsCount], utf16Letters = new int[threadsCount], utf8Letters = new int[threadsCount];
 		ListHashSet<int> singleNulls = new(), doubleNulls = new();
 		if (originalFile.Length == 0)
 		{
@@ -84,28 +108,29 @@ internal partial class Compression
 		Status[tn] = 0;
 		StatusMaximum[tn] = originalFile.Length;
 		if (originalFile[0] is >= 0xC0 and <= 0xFF)
-			ansiLetters++;
-		object lockObj = new();
+			ansiLetters[0]++;
+		var lockObj = RedStarLinq.FillArray(threadsCount, _ => new object());
 		Status[tn]++;
 		Parallel.For(1, originalFile.Length, (i, pls) =>
 		{
 			if (originalFile[i] == 0)
 			{
-				lock (lockObj) singleNulls.Add(i);
+				lock (lockObj[i % threadsCount]) singleNulls.Add(i);
 				if (originalFile[i - 1] == 0)
-					lock (lockObj) doubleNulls.Add(i - 1);
+					lock (lockObj[i % threadsCount]) doubleNulls.Add(i - 1);
 			}
 			if (originalFile[i] is >= 0xC0 and <= 0xFF)
-				lock (lockObj)
-					ansiLetters++;
+				lock (lockObj[i % threadsCount])
+					ansiLetters[i % threadsCount]++;
 			else if (originalFile[i - 1] >= 0x10 && originalFile[i - 1] <= 0x4F && originalFile[i] == 0x04 || originalFile[i - 1] >= 0x20 && originalFile[i - 1] <= 0x7F && originalFile[i] == 0x00)
-				lock (lockObj)
-					utf16Letters++;
+				lock (lockObj[i % threadsCount])
+					utf16Letters[i % threadsCount]++;
 			else if (originalFile[i - 1] == 0xD0 && originalFile[i] >= 0x90 && originalFile[i] <= 0xBF || originalFile[i - 1] == 0xD1 && originalFile[i] >= 0x80 && originalFile[i] <= 0x8F)
-				lock (lockObj)
-					utf8Letters++;
+				lock (lockObj[i % threadsCount])
+					utf8Letters[i % threadsCount]++;
 			Status[tn]++;
 		});
+		int ansiLettersSum = ansiLetters.Sum(), utf16LettersSum = utf16Letters.Sum(), utf8LettersSum = utf8Letters.Sum();
 		var nullSequenceStart = -1;
 		doubleNulls.FilterInPlace((x, index) => (index == 0 || doubleNulls[index - 1] != x - 1 || (index - nullSequenceStart) % 2 == 0) && (nullSequenceStart = index) >= 0);
 		if (doubleNulls.Length * doubleNulls.Length * 400 >= originalFile.Length)
@@ -114,16 +139,21 @@ internal partial class Compression
 			nulls = new();
 			return "";
 		}
-		if ((utf16Letters >= (originalFile.Length + 9) / 10 || utf16Letters > ansiLetters) && utf16Letters > utf8Letters)
+		if ((utf16LettersSum >= (originalFile.Length + 9) / 10 || utf16LettersSum > ansiLettersSum) && utf16LettersSum > utf8LettersSum)
 		{
 			encoding = 1;
 			nulls = doubleNulls;
 			return Encoding.Unicode.GetString(originalFile.Filter((x, index) => !doubleNulls.Contains(index) && !doubleNulls.Contains(index - 1)).ToArray());
 		}
-		else if (utf8Letters >= (originalFile.Length + 9) / 10 || utf8Letters > ansiLetters)
+		else if (utf8LettersSum >= (originalFile.Length + 9) / 10 || utf8LettersSum > ansiLettersSum)
 		{
 			encoding = 2;
 			nulls = doubleNulls;
+			if (originalFile[^1] >= ValuesInByte >> 1)
+			{
+				redundantByte = originalFile[^1];
+				return Encoding.UTF8.GetString(originalFile.GetSlice(..^1).Filter((x, index) => !doubleNulls.Contains(index) && !doubleNulls.Contains(index - 1)).ToArray());
+			}
 			return Encoding.UTF8.GetString(originalFile.Filter((x, index) => !doubleNulls.Contains(index) && !doubleNulls.Contains(index - 1)).ToArray());
 		}
 		else
@@ -153,19 +183,40 @@ internal partial class Compression
 		StatusMaximum[tn] = text.Length;
 		for (var i = 0; i < text.Length; i++, Status[tn]++)
 		{
-			if (text[i] is >= 'A' and <= 'Z' or >= 'А' and <= 'Я')
+			if (text[i] == ' ')
+			{
+				if (state == 4)
+				{
+					outputWords.Add(new Word(text[wordStart..(i - 1)], true));
+					wordStart = i;
+				}
+				space = true;
+				state = 4;
+			}
+			else if (state is 7 or 9)
+			{
+				if (Decoding.DecodeSHETChar(text[i]) < (state == 7 ? SHETThreshold1 : SHETThreshold2))
+					state = 2;
+				else
+					state++;
+			}
+			else if (state is 8 or 10)
+				state = 2;
+			else if (text[i] is >= 'A' and <= 'Z' or >= 'А' and <= 'Я')
 			{
 				switch (state)
 				{
 					case 0:
 					case 1:
+					case >= 7 and <= 10:
 					break;
 					default:
 					outputWords.Add(new Word(text[wordStart..(i - (space ? 1 : 0))], space));
 					wordStart = i;
 					break;
 				}
-				state = 1;
+				if (state is not (>= 7 and <= 10))
+					state = 1;
 			}
 			else if (text[i] is >= 'a' and <= 'z' or >= 'а' and <= 'я')
 			{
@@ -174,13 +225,15 @@ internal partial class Compression
 					case 0:
 					case 1:
 					case 2:
+					case >= 7 and <= 10:
 					break;
 					default:
 					outputWords.Add(new Word(text[wordStart..(i - (space ? 1 : 0))], space));
 					wordStart = i;
 					break;
 				}
-				state = 2;
+				if (state is not (>= 7 and <= 10))
+					state = 2;
 			}
 			else if (text[i] is >= '0' and <= '9')
 			{
@@ -195,16 +248,6 @@ internal partial class Compression
 					break;
 				}
 				state = 3;
-			}
-			else if (text[i] == ' ')
-			{
-				if (state == 4)
-				{
-					outputWords.Add(new Word(text[wordStart..(i - 1)], true));
-					wordStart = i;
-				}
-				space = true;
-				state = 4;
 			}
 			else if (text[i] == '\r')
 			{
@@ -221,9 +264,9 @@ internal partial class Compression
 				}
 				state = 6;
 			}
-			else if (text[i] == '\x99')
+			else if (text[i] == '\x14')
 			{
-				if (state is 1 or 2)
+				if (state is 1 or 2 or >= 7 and <= 10)
 					state = 7;
 				else
 				{
@@ -232,15 +275,6 @@ internal partial class Compression
 					state = 9;
 				}
 			}
-			else if (state is 7 or 9)
-			{
-				if (text[i] < (state == 7 ? SHETThreshold1 : SHETThreshold2))
-					state = 2;
-				else
-					state++;
-			}
-			else if (state is 8 or 10)
-				state = 2;
 			else
 			{
 				state = 11;

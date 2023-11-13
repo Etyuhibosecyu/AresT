@@ -22,12 +22,13 @@ internal record class AdaptiveHuffman(int TN)
 
 	public byte[] Encode(List<List<ShortIntervalList>> input, LZData[] lzData)
 	{
-		if (input.Any(x => x.Length < 2))
+		if (input.GetSlice(..WordsListActualParts).Any(x => x.Length < 2))
 			throw new EncoderFallbackException();
 		using ArithmeticEncoder ar = new();
-		for (var i = 0; i < input.Length; i++, _ = i < input.Length ? Subtotal[TN] += ProgressBarStep : 0)
+		for (var i = 0; i < WordsListActualParts; i++, _ = i < WordsListActualParts ? Subtotal[TN] += ProgressBarStep : 0)
 			if (!AdaptiveHuffmanInternal(ar, input[i], lzData[i], i))
 				throw new EncoderFallbackException();
+		input.GetSlice(WordsListActualParts).ForEach(dl => dl.ForEach(l => l.ForEach(x => ar.WritePart(x.Lower, x.Length, x.Base))));
 		ar.WriteEqual(1234567890, 4294967295);
 		return ar;
 	}
@@ -97,7 +98,7 @@ file sealed record class AdaptiveHuffmanMain(ArithmeticEncoder Ar, List<ShortInt
 		{
 			item = Input[i][0].Lower;
 			sum = Set.GetLeftValuesSum(item, out frequency);
-			bufferInterval = GetBufferInterval((uint)Set.ValuesSum);
+			bufferInterval = Max((uint)Set.Length, 1);
 			var fullBase = (uint)(Set.ValuesSum + bufferInterval);
 			if (frequency == 0)
 			{

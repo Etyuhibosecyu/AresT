@@ -38,11 +38,9 @@ internal partial class Compression
 			rle = 14;
 			cstring = string2;
 		}
-		(originalFile2, var repeatsCount) = Repeats(cstring);
+		originalFile2 = cstring;
 		cdl = new ShortIntervalList[originalFile2.Length + 1];
-		cdl[0] = new() { repeatsCount == 1 ? RepeatsNotApplied : RepeatsApplied };
-		if (repeatsCount > 1)
-			cdl[0].WriteCount((uint)repeatsCount - 2);
+		cdl[0] = new() { RepeatsNotApplied };
 		var originalFile2_ = originalFile2;
 		Parallel.For(0, originalFile2.Length, i => cdl[i + 1] = ByteIntervals[originalFile2_[i]]);
 		Subtotal[tn] += ProgressBarStep;
@@ -98,11 +96,14 @@ internal partial class Compression
 		if ((PresentMethods & UsedMethods.LZ2) != 0)
 		{
 			tl1 = RedStarLinq.Fill(ctl.Length, _ => new List<ShortIntervalList>());
-			for (var i = 0; i < ctl.Length; i++)
+			for (var i = 0; i < WordsListActualParts; i++)
 			{
 				tl1[i] = new(new LempelZiv(ctl[i], result, tn).Encode(out lzData[i]));
 				Subtotal[tn] += ProgressBarStep;
 			}
+			for (var i = WordsListActualParts; i < ctl.Length; i++)
+				for (var j = 0; j < ctl[i].Length; j++)
+					tl1[i].Add(new(ctl[i][j]));
 			s = WorkUpTripleList(tl1, tn);
 		}
 		else
@@ -162,7 +163,7 @@ internal partial class Compression
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 7;
 		ctl = MakeWordsSplit((PresentMethods & UsedMethods.SHET4) != 0);
-		if (ctl.Length != 3)
+		if (ctl.Length is not (3 or 4))
 			throw new EncoderFallbackException();
 		Subtotal[tn] += ProgressBarStep;
 		ctl[1] = new(BWT(ctl[1], true));
@@ -171,7 +172,7 @@ internal partial class Compression
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < cs.Length && s.Length > 0)
 		{
-			hf = 4 + ((PresentMethods & UsedMethods.SHET2) != 0 ? 2 : 1);
+			hf = 4 + ((PresentMethods & UsedMethods.SHET4) != 0 ? 2 : 1);
 			cs = s;
 		}
 	}
@@ -218,7 +219,7 @@ internal partial class Compression
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < originalFile.Length && s.Length > 0)
 		{
-			indicator = 66;
+			indicator = (PresentMethods & UsedMethods.SHET7) != 0 ? 67 : 66;
 			cs = s;
 		}
 	}

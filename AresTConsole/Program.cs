@@ -161,10 +161,11 @@ void WorkUpReceiveMessage(byte[] message)
 					StatusSeconds[i] = 0;
 				}
 				newStatus[i] = (double)BitConverter.ToInt32(message.AsSpan(i * 24 + 33, 4)) / (BitConverter.ToInt32(message.AsSpan(i * 24 + 37, 4)) + 1);
-				if (++StatusSeconds[i] >= 10 && Status[i] != 0)
+				if (++StatusSeconds[i] >= 10 && newStatus[i] != 0)
 				{
 					WriteLine("Status[{0}]: {1:F2}%", i, newStatus[i] * 100);
 					Status[i] = newStatus[i];
+					StatusSeconds[i] = 0;
 				}
 			}
 		}

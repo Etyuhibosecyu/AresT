@@ -6,25 +6,25 @@ namespace AresTLib;
 
 internal partial class Compression
 {
-	public static (NList<byte> RepeatingBytes, int RepeatsCount) Repeats(NList<byte> input)
-	{
-		if (input.Length <= 2)
-			return (input, 1);
-		var findIndex = 1;
-		while ((findIndex = input.IndexOf(input[0], findIndex + 1)) >= 0 && findIndex < input.Length >> 1)
-		{
-			var (quotient, remainder) = DivRem(input.Length, findIndex);
-			if (remainder != 0)
-				continue;
-			if (new Chain(quotient - 1).All(x => RedStarLinq.Equals(input.GetSlice(0, findIndex), input.GetSlice(findIndex * (x + 1), findIndex))))
-				return (input.GetRange(0, findIndex), quotient);
-		}
-		return (input, 1);
-	}
-
 	private BitList ArchaicHuffman(List<ShortIntervalList> input)
 	{
-		if (!(input.Length >= (CreateVar(input[0].Length >= 1 && input[0][0] == LengthsApplied, out var lengths) ? 4 : 3) && input.GetSlice(CreateVar(lengths ? (int)input[0][1].Base + 1 : 1, out var startPos)).All(x => x.Length >= 1 && x.All(y => y.Length == 1)) && input.GetSlice(startPos + 1).All(x => x[0].Base == input[startPos][0].Base)))
+		var bwtIndex = input[0].IndexOf(BWTApplied);
+		if (CreateVar(input[0].IndexOf(HuffmanApplied), out var huffmanIndex) != -1 && !(bwtIndex != -1 && huffmanIndex == bwtIndex + 1))
+			throw new EncoderFallbackException();
+		Current[tn] = 0;
+		CurrentMaximum[tn] = ProgressBarStep * 2;
+		Status[tn] = 0;
+		StatusMaximum[tn] = 3;
+		var lz = CreateVar(input[0].IndexOf(LempelZivApplied), out var lzIndex) != -1 && (bwtIndex == -1 || lzIndex != bwtIndex + 1);
+		var lzDummy = CreateVar(input[0].IndexOf(LempelZivDummyApplied), out var lzDummyIndex) != -1 && (bwtIndex == -1 || lzDummyIndex != bwtIndex + 1);
+		var bwtLength = bwtIndex != -1 ? (int)input[0][bwtIndex + 1].Base : 0;
+		var startPos = (lz || lzDummy ? (input[0].Length >= lzIndex + 2 && input[0][lzIndex + 1] == LempelZivSubdivided ? 3 : 2) : 1) + (input[0].Length >= 1 && input[0][0] == LengthsApplied ? (int)input[0][1].Base : 0) + bwtLength;
+		Status[tn]++;
+		var lzPos = bwtIndex != -1 ? 4 : 2;
+		if (input.Length < startPos + lzPos + 1)
+			throw new EncoderFallbackException();
+		var originalBase = input[startPos + lzPos][0].Base;
+		if (!input.GetSlice(startPos + lzPos + 1).All((x, index) => bwtIndex != -1 && (index + lzPos + 1) % (BWTBlockSize + 2) is 0 or 1 || x[0].Base == originalBase))
 			throw new EncoderFallbackException();
 		var frequencyTable = input.GetSlice(startPos).FrequencyTable(x => x[0].Lower).NSort(x => ~(uint)x.Count);
 		var nodes = frequencyTable.Convert(x => new ArchaicHuffmanNode(x.Key, x.Count));
@@ -58,7 +58,7 @@ internal partial class Compression
 		Current[tn] += ProgressBarStep;
 		for (var i = 0; i < frequencyTable.Length; i++, Status[tn]++)
 		{
-			result.AddRange(EncodeEqual(frequencyTable[i].Key, input[startPos][0].Base));
+			result.AddRange(EncodeEqual(frequencyTable[i].Key, input[startPos + lzPos][0].Base));
 			if (i != 0)
 				result.AddRange(EncodeEqual((uint)frequencyTable[i].Count - 1, (uint)frequencyTable[i - 1].Count));
 		}
@@ -118,7 +118,7 @@ internal partial class Compression
 			{
 				var x = input2[i][j];
 				var y = decoded[i][j];
-				if (!(x.Equals(y) || GetBaseWithBuffer(x.Base) == y.Base && x.Lower == y.Lower && x.Length == y.Length))
+				if (!(x.Equals(y) || GetBaseWithBuffer(x.Base, words) == y.Base && x.Lower == y.Lower && x.Length == y.Length))
 					throw new DecoderFallbackException();
 			}
 		if (input2.Length != decoded.Length)
@@ -253,17 +253,19 @@ internal partial class Compression
 	{
 		Status[tn] = 0;
 		StatusMaximum[tn] = originalString.Length;
-		var pattern1 = @"(?<=[A-Za-zА-Яа-я])(" + string.Join('|', SHETEndinds.GetSlice(0, 3).ToArray(x => string.Join('|', x.Filter(x => x.Length > 2).SortDesc(x => x.Length).ToArray()))) + ")";
-		var pattern2 = @"(?<![A-Za-zА-Яа-я])(" + string.Join('|', SHETEndinds[3].Filter(x => x.Length > 2).SortDesc(x => x.Length).ToArray()) + ")";
-		return Regex.Replace(Regex.Replace(originalString.Replace("" + specialSymbols.Starter, "" + specialSymbols.Starter + specialSymbols.Escape), pattern1, x => GetSHETReplacer(x, specialSymbols, SHETDic1, SHETThreshold1)), pattern2, x => GetSHETReplacer(x, specialSymbols, SHETDic2, SHETThreshold2));
+		var pattern1 = @"(?<=[A-Za-zА-Яа-я])(?<!" + specialSymbols.Starter + "(?:[\x01-\x1F\x21-\x7F" + Encoding1251.GetString(new Chain(ValuesInByte >> 1, SHETThreshold2 - (ValuesInByte >> 1)).ToArray(x => (byte)x)) + "]?|(?:[" + Encoding1251.GetString(new Chain(SHETThreshold2, ValuesInByte - SHETThreshold2).ToArray(x => (byte)x)) + "]?).?))(?:" + string.Join('|', SHETEndinds.GetSlice(1..5).ToArray(x => string.Join('|', x.Filter(x => x.Length > 2).SortDesc(x => x.Length).ToArray()))) + ")";
+		var pattern2 = @"(?<![A-Za-zА-Яа-я" + specialSymbols.Escape + "]|" + specialSymbols.Starter + "(?:[\x01-\x1F\x21-\x7F" + Encoding1251.GetString(new Chain(ValuesInByte >> 1, SHETThreshold2 - (ValuesInByte >> 1)).ToArray(x => (byte)x)) + "]?|(?:[" + Encoding1251.GetString(new Chain(SHETThreshold2, ValuesInByte - SHETThreshold2).ToArray(x => (byte)x)) + "]?).?))(?:" + string.Join('|', SHETEndinds.GetSlice(4..).JoinIntoSingle().Filter(x => x.Length > 2).SortDesc(x => x.Length).ToArray()) + ")";
+		return Regex.Replace(Regex.Replace(originalString.Replace("" + specialSymbols.Starter, "" + specialSymbols.Escape + specialSymbols.Starter), pattern2, x => GetSHETReplacer(x, specialSymbols, SHETHS2, SHETThreshold2)), pattern1, x => GetSHETReplacer(x, specialSymbols, SHETHS1, SHETThreshold1));
 	}
 
-	private string GetSHETReplacer(Match x, (char Starter, char Escape) specialSymbols, Dictionary<string, int> dic, int threshold)
+	private string GetSHETReplacer(Match x, (char Starter, char Escape) specialSymbols, ListHashSet<string> hs, int threshold)
 	{
 		Status[tn] = x.Index;
-		if (!dic.TryGetValue(x.Value, out var index))
+		if (!hs.TryGetIndexOf(x.Value, out var index))
 			return x.Value;
-		var s = index < threshold ? "" + specialSymbols.Starter + (char)index : "" + specialSymbols.Starter + (char)(((index - threshold) >> BitsPerByte) + threshold) + (char)(byte)(index - threshold);
+		var s = index < threshold ? "" + specialSymbols.Starter + ToSHETChar(index) : "" + specialSymbols.Starter + ToSHETChar((index - threshold) / (ValuesInByte - 2) + threshold) + ToSHETChar((index - threshold) % (ValuesInByte - 2));
 		return s.Length < x.Length ? s : x.Value;
 	}
+
+	private static char ToSHETChar(int x) => Encoding1251.GetChars(new[] { (byte)(x + (x >= 31 ? 2 : 1)) })[0];
 }
