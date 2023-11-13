@@ -11,6 +11,9 @@ global using static AresGlobalMethods007.Decoding;
 global using static Corlib.NStar.Extents;
 global using static System.Math;
 global using static UnsafeFunctions.Global;
+global using HuffmanData = AresGlobalMethods005.HuffmanData;
+global using MethodDataUnit = AresGlobalMethods005.MethodDataUnit;
+global using LZData = AresGlobalMethods005.LZData;
 
 namespace AresTLib007;
 
@@ -89,20 +92,7 @@ public static class Decoding
 		return byteList.Repeat(repeatsCount).ToArray();
 	}
 
-	private static NList<byte> JoinWords(this List<List<ShortIntervalList>> input, ListHashSet<int> nulls) => input.Wrap(tl =>
-	{
-		var encoding = tl[0][^1][0].Lower;
-		var encoding2 = (encoding == 1) ? Encoding.Unicode : (encoding == 2) ? Encoding.UTF8 : Encoding.GetEncoding(1251);
-		var a = 0;
-		var wordsList = tl[0].GetSlice(..^1).Convert(l => encoding2.GetString(tl[1][a..(a += (int)l[0].Lower)].ToArray(x => (byte)x[0].Lower)));
-		var result = encoding2.GetBytes(tl[2].ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => l[1].Lower == 1 ? new List<char>(x).Add(' ') : x)).ToArray()).ToNList();
-		foreach (var x in nulls)
-			if (encoding == 0)
-				result.Insert(x, 0);
-			else
-				result.Insert(x, new byte[] { 0, 0 });
-		return result;
-	});
+	private static NList<byte> JoinWords(this List<List<ShortIntervalList>> input, ListHashSet<int> nulls) => AresTLib005.Decoding.JoinWords(input, nulls);
 
 	private static List<ShortIntervalList> Decode2(ArithmeticDecoder ar, int hf, bool hfw, int bwt, int lz, ref int repeatsCount, ListHashSet<int> nulls = default!, int n = 0)
 	{
@@ -340,26 +330,7 @@ public static class Decoding
 				//		dist = maxDist + 1;
 				//}
 			}
-			result[^1].Add(new(dist, maxDist + lzData.UseSpiralLengths + 1));
-			if (dist == maxDist + 1)
-			{
-				if (lzData.SpiralLength.R == 0)
-					spiralLength = ar.ReadEqual(lzData.SpiralLength.Max + 1);
-				else if (lzData.SpiralLength.R == 1)
-				{
-					spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold + 2);
-					if (spiralLength == lzData.SpiralLength.Threshold + 1)
-						spiralLength += ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold);
-				}
-				else
-				{
-					spiralLength = ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold + 2) + lzData.SpiralLength.Threshold;
-					if (spiralLength == lzData.SpiralLength.Max + 1)
-						spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold);
-				}
-				result[^1].Add(new(spiralLength, lzData.SpiralLength.Max + 1));
-			}
-			fullLength += (int)((length + 2) * (spiralLength + 1));
+			ar.ProcessAdaptiveDist(lzData, result, ref fullLength, dist, length, ref spiralLength, maxDist);
 			if (lz != 0 && distsSL.Length < firstIntervalDist)
 				new Chain((int)Min(firstIntervalDist - distsSL.Length, (length + 2) * (spiralLength + 1))).ForEach(x => distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1));
 		}
@@ -367,87 +338,9 @@ public static class Decoding
 		return result.DecodeLempelZiv(lz != 0, 0, 0, 0, 0, lzData.UseSpiralLengths, 0, 0, 0);
 	}
 
-	private static List<ShortIntervalList> ReadCompressedList(this ArithmeticDecoder ar, HuffmanData huffmanData, int bwt, LZData lzData, int lz, int counter, bool spaceCodes)
-	{
-		Status[0] = 0;
-		StatusMaximum[0] = counter;
-		List<ShortIntervalList> result = new();
-		var startingArithmeticMap = lz == 0 ? huffmanData.ArithmeticMap : huffmanData.ArithmeticMap[..^1];
-		var uniqueLists = spaceCodes ? RedStarLinq.Fill(2, i => huffmanData.UniqueList.PConvert(x => new ShortIntervalList { x, new((uint)i, 2) })) : huffmanData.UniqueList.Convert(x => new ShortIntervalList() { x });
-		for (; counter > 0; counter--, Status[0]++)
-		{
-			var readIndex = ar.ReadPart(result.Length < 2 || bwt != 0 && (result.Length < 4 || (result.Length + 0) % (BWTBlockSize + 2) is 0 or 1) ? startingArithmeticMap : huffmanData.ArithmeticMap);
-			if (!(lz != 0 && readIndex == huffmanData.ArithmeticMap.Length - 1))
-			{
-				result.Add(uniqueLists[spaceCodes ? (int)ar.ReadEqual(2) * 1 : 0][readIndex]);
-				continue;
-			}
-			uint dist, length, spiralLength = 0;
-			if (lzData.Length.R == 0)
-				length = ar.ReadEqual(lzData.Length.Max + 1);
-			else if (lzData.Length.R == 1)
-			{
-				length = ar.ReadEqual(lzData.Length.Threshold + 2);
-				if (length == lzData.Length.Threshold + 1)
-					length += ar.ReadEqual(lzData.Length.Max - lzData.Length.Threshold);
-			}
-			else
-			{
-				length = ar.ReadEqual(lzData.Length.Max - lzData.Length.Threshold + 2) + lzData.Length.Threshold;
-				if (length == lzData.Length.Max + 1)
-					length = ar.ReadEqual(lzData.Length.Threshold);
-			}
-			if (length > result.Length - 2)
-				throw new DecoderFallbackException();
-			var maxDist = Min(lzData.Dist.Max, (uint)(result.Length - length - 2));
-			if (lzData.Dist.R == 0 || maxDist < lzData.Dist.Threshold)
-				dist = ar.ReadEqual(maxDist + lzData.UseSpiralLengths + 1);
-			else if (lzData.Dist.R == 1)
-			{
-				dist = ar.ReadEqual(lzData.Dist.Threshold + 2);
-				if (dist == lzData.Dist.Threshold + 1)
-					dist += ar.ReadEqual(maxDist - lzData.Dist.Threshold + lzData.UseSpiralLengths);
-			}
-			else
-			{
-				dist = ar.ReadEqual(maxDist - lzData.Dist.Threshold + 2) + lzData.Dist.Threshold;
-				if (dist == maxDist + 1)
-				{
-					dist = ar.ReadEqual(lzData.Dist.Threshold + lzData.UseSpiralLengths);
-					if (dist == lzData.Dist.Threshold)
-						dist = maxDist + 1;
-				}
-			}
-			if (dist == maxDist + 1)
-			{
-				if (lzData.SpiralLength.R == 0)
-					spiralLength = ar.ReadEqual(lzData.SpiralLength.Max + 1);
-				else if (lzData.SpiralLength.R == 1)
-				{
-					spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold + 2);
-					if (spiralLength == lzData.SpiralLength.Threshold + 1)
-						spiralLength += ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold);
-				}
-				else
-				{
-					spiralLength = ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold + 2) + lzData.SpiralLength.Threshold;
-					if (spiralLength == lzData.SpiralLength.Max + 1)
-						spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold);
-				}
-				dist = 0;
-			}
-			var start = (int)(result.Length - dist - length - 2);
-			if (start < 0)
-				throw new DecoderFallbackException();
-			var fullLength = (int)((length + 2) * (spiralLength + 1));
-			for (var i = fullLength; i > 0; i -= (int)length + 2)
-			{
-				var length2 = (int)Min(length + 2, i);
-				result.AddRange(result.GetRange(start, length2));
-			}
-		}
-		return result;
-	}
+	private static void ProcessAdaptiveDist(this ArithmeticDecoder ar, LZData lzData, List<ShortIntervalList> result, ref int fullLength, uint dist, uint length, ref uint spiralLength, uint maxDist) => AresTLib005.Decoding.ProcessAdaptiveDist(ar, lzData, result, ref fullLength, dist, length, ref spiralLength, maxDist);
+
+	private static List<ShortIntervalList> ReadCompressedList(this ArithmeticDecoder ar, HuffmanData huffmanData, int bwt, LZData lzData, int lz, int counter, bool spaceCodes) => AresTLib005.Decoding.ReadCompressedList(ar, huffmanData, bwt, lzData, lz, counter, spaceCodes);
 
 	private static List<ShortIntervalList> DecodePPM(this ArithmeticDecoder ar, uint inputBase, ref int repeatsCount, int n = -1)
 	{

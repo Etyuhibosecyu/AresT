@@ -82,7 +82,7 @@ public static class Decoding
 		return byteList.ToArray();
 	}
 
-	private static NList<byte> JoinWords(this List<List<ShortIntervalList>> input, ListHashSet<int> nulls) => input.Wrap(tl =>
+	public static NList<byte> JoinWords(this List<List<ShortIntervalList>> input, ListHashSet<int> nulls) => input.Wrap(tl =>
 	{
 		var encoding = tl[0][^1][0].Lower;
 		var encoding2 = (encoding == 1) ? Encoding.Unicode : (encoding == 2) ? Encoding.UTF8 : Encoding.GetEncoding(1251);
@@ -320,31 +320,36 @@ public static class Decoding
 						dist = maxDist + 1;
 				}
 			}
-			result[^1].Add(new(dist, maxDist + lzData.UseSpiralLengths + 1));
-			if (dist == maxDist + 1)
-			{
-				if (lzData.SpiralLength.R == 0)
-					spiralLength = ar.ReadEqual(lzData.SpiralLength.Max + 1);
-				else if (lzData.SpiralLength.R == 1)
-				{
-					spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold + 2);
-					if (spiralLength == lzData.SpiralLength.Threshold + 1)
-						spiralLength += ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold);
-				}
-				else
-				{
-					spiralLength = ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold + 2) + lzData.SpiralLength.Threshold;
-					if (spiralLength == lzData.SpiralLength.Max + 1)
-						spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold);
-				}
-				result[^1].Add(new(spiralLength, lzData.SpiralLength.Max + 1));
-			}
-			fullLength += (int)((length + 2) * (spiralLength + 1));
+			ar.ProcessAdaptiveDist(lzData, result, ref fullLength, dist, length, ref spiralLength, maxDist);
 		}
 		return DecodeLempelZiv(result, lz != 0, 0, 0, 0, 0, lzData.UseSpiralLengths, 0, 0, 0);
 	}
 
-	private static List<ShortIntervalList> ReadCompressedList(this ArithmeticDecoder ar, HuffmanData huffmanData, int bwt, LZData lzData, int lz, int counter, bool spaceCodes)
+	public static void ProcessAdaptiveDist(this ArithmeticDecoder ar, LZData lzData, List<ShortIntervalList> result, ref int fullLength, uint dist, uint length, ref uint spiralLength, uint maxDist)
+	{
+		result[^1].Add(new(dist, maxDist + lzData.UseSpiralLengths + 1));
+		if (dist == maxDist + 1)
+		{
+			if (lzData.SpiralLength.R == 0)
+				spiralLength = ar.ReadEqual(lzData.SpiralLength.Max + 1);
+			else if (lzData.SpiralLength.R == 1)
+			{
+				spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold + 2);
+				if (spiralLength == lzData.SpiralLength.Threshold + 1)
+					spiralLength += ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold);
+			}
+			else
+			{
+				spiralLength = ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold + 2) + lzData.SpiralLength.Threshold;
+				if (spiralLength == lzData.SpiralLength.Max + 1)
+					spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold);
+			}
+			result[^1].Add(new(spiralLength, lzData.SpiralLength.Max + 1));
+		}
+		fullLength += (int)((length + 2) * (spiralLength + 1));
+	}
+
+	public static List<ShortIntervalList> ReadCompressedList(this ArithmeticDecoder ar, HuffmanData huffmanData, int bwt, LZData lzData, int lz, int counter, bool spaceCodes)
 	{
 		Status[0] = 0;
 		StatusMaximum[0] = counter;
