@@ -8,23 +8,26 @@ global using System.Threading.Tasks;
 global using UnsafeFunctions;
 global using G = System.Collections.Generic;
 global using static AresGlobalMethods007.Decoding;
+global using static AresTLib005.DecodingExtents;
 global using static Corlib.NStar.Extents;
 global using static System.Math;
 global using static UnsafeFunctions.Global;
+global using ArithmeticDecoder = AresGlobalMethods005.ArithmeticDecoder;
 global using HuffmanData = AresGlobalMethods005.HuffmanData;
 global using MethodDataUnit = AresGlobalMethods005.MethodDataUnit;
 global using LZData = AresGlobalMethods005.LZData;
 
 namespace AresTLib007;
 
-public static class Decoding
+public class Decoding : AresTLib005.Decoding
 {
 	internal const byte ProgramVersion = 2;
 	internal const int FragmentLength = 8000000;
 	internal const int BWTBlockSize = 50000;
 	internal static int BWTBlockExtraSize => BWTBlockSize <= 0x8000 ? 2 : BWTBlockSize <= 0x800000 ? 3 : BWTBlockSize <= 0x80000000 ? 4 : BWTBlockSize <= 0x8000000000 ? 5 : BWTBlockSize <= 0x800000000000 ? 6 : BWTBlockSize <= 0x80000000000000 ? 7 : 8;
+	protected int repeatsCount = 1;
 
-	public static byte[] Decode(byte[] compressedFile, byte encodingVersion)
+	public override byte[] Decode(byte[] compressedFile, byte encodingVersion)
 	{
 		if (compressedFile.Length <= 2)
 			return Array.Empty<byte>();
@@ -33,7 +36,7 @@ public static class Decoding
 		else if (encodingVersion < ProgramVersion)
 			return encodingVersion switch
 			{
-				1 => AresTLib005.Decoding.Decode(compressedFile, encodingVersion),
+				1 => new AresTLib005.Decoding().Decode(compressedFile, encodingVersion),
 				_ => throw new DecoderFallbackException(),
 			};
 		int method = compressedFile[0];
@@ -41,12 +44,15 @@ public static class Decoding
 			return compressedFile[1..];
 		else if (compressedFile.Length <= 2)
 			throw new DecoderFallbackException();
-		int misc = method >= 64 ? method % 64 % 7 : -1, hf = method % 64 % 7, rle = method % 64 % 21 / 7 * 7, lz = method % 64 % 42 / 21 * 21, bwt = method % 64 / 42 * 42;
-		var hfw = hf is 2 or 3 or 5 or 6;
+		misc = method >= 64 ? method % 64 % 7 : -1;
+		hf = method % 64 % 7;
+		rle = method % 64 % 21 / 7 * 7;
+		lz = method % 64 % 42 / 21 * 21;
+		bwt = method % 64 / 42 * 42;
+		hfw = hf is 2 or 3 or 5 or 6;
 		if (method != 0 && compressedFile.Length <= 5)
 			throw new DecoderFallbackException();
 		NList<byte> byteList;
-		var repeatsCount = 1;
 		if (misc == 2)
 		{
 			using ArithmeticDecoder ar = compressedFile[1..];
@@ -62,24 +68,24 @@ public static class Decoding
 				nulls.Add((int)ar.ReadCount((uint)BitsCount(FragmentLength)) + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
 			Current[0] = 0;
 			CurrentMaximum[0] = ProgressBarStep * 5;
-			List<List<ShortIntervalList>> list = DecodePPM(ar, maxLength, ref repeatsCount, 0);
+			List<List<ShortIntervalList>> list = DecodePPM(ar, maxLength, 0);
 			list[0].Add(new() { new(encoding, 3) });
 			Current[0] += ProgressBarStep;
-			list.Add(DecodePPM(ar, ValuesInByte, ref repeatsCount, 1));
+			list.Add(DecodePPM(ar, ValuesInByte, 1));
 			Current[0] += ProgressBarStep;
-			list.Add(DecodePPM(ar, (uint)list[0].Length - 1, ref repeatsCount, 2));
+			list.Add(DecodePPM(ar, (uint)list[0].Length - 1, 2));
 			Current[0] += ProgressBarStep;
-			byteList = list.JoinWords(nulls);
+			byteList = JoinWords(list, nulls);
 		}
 		else if (misc == 1)
-			byteList = DecodePPM(compressedFile[1..], ValuesInByte, ref repeatsCount).PNConvert(x => (byte)x[0].Lower);
+			byteList = DecodePPM(compressedFile[1..], ValuesInByte).PNConvert(x => (byte)x[0].Lower);
 		else if (hf + lz + bwt != 0)
 		{
 			Current[0] = 0;
 			CurrentMaximum[0] = ProgressBarStep * (bwt != 0 ? (hfw ? 8 : 4) : (hfw ? 7 : 3));
 			using ArithmeticDecoder ar = compressedFile[1..];
 			ListHashSet<int> nulls = new();
-			byteList = hfw ? RedStarLinq.Fill(3, i => Decode2(ar, hf, hfw, bwt, lz, ref repeatsCount, nulls, i)).JoinWords(nulls) : Decode2(ar, hf, hfw, bwt, lz, ref repeatsCount).PNConvert(x => (byte)x[0].Lower);
+			byteList = hfw ? JoinWords(RedStarLinq.Fill(3, i => (n = i, Decode2(ar, nulls)).Item2), nulls) : Decode2(ar).PNConvert(x => (byte)x[0].Lower);
 		}
 		else
 			byteList = compressedFile.GetSlice(1).ToNList();
@@ -92,9 +98,7 @@ public static class Decoding
 		return byteList.Repeat(repeatsCount).ToArray();
 	}
 
-	private static NList<byte> JoinWords(this List<List<ShortIntervalList>> input, ListHashSet<int> nulls) => AresTLib005.Decoding.JoinWords(input, nulls);
-
-	private static List<ShortIntervalList> Decode2(ArithmeticDecoder ar, int hf, bool hfw, int bwt, int lz, ref int repeatsCount, ListHashSet<int> nulls = default!, int n = 0)
+	protected override List<ShortIntervalList> Decode2(ArithmeticDecoder ar, ListHashSet<int> nulls = default!)
 	{
 		var counter = (int)ar.ReadCount() - (hfw && n == 0 ? 2 : 1);
 		uint lzRDist, lzMaxDist, lzThresholdDist = 0, lzRLength, lzMaxLength, lzThresholdLength = 0, lzUseSpiralLengths = 0, lzRSpiralLength, lzMaxSpiralLength, lzThresholdSpiralLength = 0;
@@ -126,6 +130,7 @@ public static class Decoding
 			}
 			counter -= GetArrayLength(counter2, 4);
 		}
+		var lz = this.lz;
 		if (lz != 0)
 		{
 			var counter2 = 7;
@@ -167,80 +172,10 @@ public static class Decoding
 			counter -= GetArrayLength(counter2, 8);
 		}
 		LZData lzData = new(lzDist, lzLength, lzUseSpiralLengths, lzSpiralLength);
-		List<ShortIntervalList> compressedList;
-		if (hf >= 4)
-		{
-			compressedList = ar.DecodeAdaptive(hfw, bwt, skipped, lzData, lz, counter, n);
-			goto l1;
-		}
-		if (hf != 0)
-		{
-			var counter2 = 4;
-			maxFrequency = (int)ar.ReadCount() + 1;
-			frequencyCount = (int)ar.ReadCount() + 1;
-			if (maxFrequency > FragmentLength || frequencyCount > FragmentLength)
-				throw new DecoderFallbackException();
-			Status[0] = 0;
-			StatusMaximum[0] = frequencyCount;
-			var @base = hfw && n == 0 ? maxLength + 1 : hfw && n == 2 ? (uint)frequencyCount : ValuesInByte;
-			if (maxFrequency > frequencyCount * 2 || frequencyCount <= ValuesInByte)
-			{
-				arithmeticMap.Add((uint)maxFrequency);
-				var prev = (uint)maxFrequency;
-				for (var i = 0; i < frequencyCount; i++, Status[0]++)
-				{
-					counter2++;
-					uniqueList.Add(new(ar.ReadEqual(@base), @base));
-					if (i == 0) continue;
-					prev = ar.ReadEqual(prev) + 1;
-					counter2++;
-					arithmeticMap.Add(arithmeticMap[^1] + prev);
-				}
-			}
-			else
-				for (var i = 0; i < frequencyCount; i++, Status[0]++)
-				{
-					uniqueList.Add(new((uint)i, hfw && n == 0 ? maxLength + 1 : (uint)frequencyCount));
-					counter2++;
-					arithmeticMap.Add((arithmeticMap.Length == 0 ? 0 : arithmeticMap[^1]) + ar.ReadEqual((uint)maxFrequency) + 1);
-				}
-			if (lz != 0)
-				arithmeticMap.Add(GetBaseWithBuffer(arithmeticMap[^1]));
-			counter -= GetArrayLength(counter2, 8);
-			if (bwt != 0 && !(hfw && n != 1))
-			{
-				var skippedCount = (int)ar.ReadCount();
-				for (var i = 0; i < skippedCount; i++)
-					skipped.Add((byte)ar.ReadEqual(@base));
-				counter -= (skippedCount + 9) / 8;
-			}
-		}
-		else
-		{
-			uniqueList.AddRange(RedStarLinq.Fill(ValuesInByte, index => new Interval((uint)index, ValuesInByte)));
-			arithmeticMap.AddRange(RedStarLinq.Fill(ValuesInByte, index => (uint)(index + 1)));
-			if (lz != 0)
-				arithmeticMap.Add(269);
-		}
-		if (counter is < 0 or > FragmentLength + FragmentLength / 1000)
-			throw new DecoderFallbackException();
-		HuffmanData huffmanData = new(maxFrequency, frequencyCount, arithmeticMap, uniqueList);
-		Current[0] += ProgressBarStep;
-		compressedList = ar.ReadCompressedList(huffmanData, bwt, lzData, lz, counter, n == 2);
-	l1:
-		if (hfw && n == 0)
-			compressedList.Add(new() { new(encoding, 3) });
-		if (bwt != 0 && !(hfw && n != 1))
-		{
-			Current[0] += ProgressBarStep;
-			compressedList = compressedList.DecodeBWT(skipped);
-		}
-		if (hfw && n != 2)
-			Current[0] += ProgressBarStep;
-		return compressedList;
+		return ProcessHuffman(ar, ref maxFrequency, ref frequencyCount, arithmeticMap, uniqueList, skipped, encoding, maxLength, lzData, lz, ref counter);
 	}
 
-	private static List<ShortIntervalList> DecodeAdaptive(this ArithmeticDecoder ar, bool hfw, int bwt, List<byte> skipped, LZData lzData, int lz, int counter, int n)
+	protected override List<ShortIntervalList> DecodeAdaptive(ArithmeticDecoder ar, List<byte> skipped, LZData lzData, int lz, int counter)
 	{
 		if (bwt != 0 && !(hfw && n != 1))
 		{
@@ -321,16 +256,8 @@ public static class Decoding
 					dist += ar.ReadEqual(maxDist - lzData.Dist.Threshold + lzData.UseSpiralLengths);
 			}
 			else
-			{
-				dist = (uint)readIndex/* + lzData.Dist.Threshold*/;
-				//if (dist == maxDist + 1)
-				//{
-				//	dist = ar.ReadEqual(lzData.Dist.Threshold + lzData.UseSpiralLengths);
-				//	if (dist == lzData.Dist.Threshold)
-				//		dist = maxDist + 1;
-				//}
-			}
-			ar.ProcessAdaptiveDist(lzData, result, ref fullLength, dist, length, ref spiralLength, maxDist);
+				dist = (uint)readIndex;
+			ProcessAdaptiveDist(ar, lzData, result, ref fullLength, dist, length, ref spiralLength, maxDist);
 			if (lz != 0 && distsSL.Length < firstIntervalDist)
 				new Chain((int)Min(firstIntervalDist - distsSL.Length, (length + 2) * (spiralLength + 1))).ForEach(x => distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1));
 		}
@@ -338,11 +265,9 @@ public static class Decoding
 		return result.DecodeLempelZiv(lz != 0, 0, 0, 0, 0, lzData.UseSpiralLengths, 0, 0, 0);
 	}
 
-	private static void ProcessAdaptiveDist(this ArithmeticDecoder ar, LZData lzData, List<ShortIntervalList> result, ref int fullLength, uint dist, uint length, ref uint spiralLength, uint maxDist) => AresTLib005.Decoding.ProcessAdaptiveDist(ar, lzData, result, ref fullLength, dist, length, ref spiralLength, maxDist);
+	protected override List<ShortIntervalList> DecodePPM(ArithmeticDecoder ar, uint inputBase, bool spaces = false) => DecodePPM(ar, inputBase, spaces ? 2 : -1);
 
-	private static List<ShortIntervalList> ReadCompressedList(this ArithmeticDecoder ar, HuffmanData huffmanData, int bwt, LZData lzData, int lz, int counter, bool spaceCodes) => AresTLib005.Decoding.ReadCompressedList(ar, huffmanData, bwt, lzData, lz, counter, spaceCodes);
-
-	private static List<ShortIntervalList> DecodePPM(this ArithmeticDecoder ar, uint inputBase, ref int repeatsCount, int n = -1)
+	protected virtual List<ShortIntervalList> DecodePPM(ArithmeticDecoder ar, uint inputBase, int n = -1)
 	{
 		if (n == -1)
 		{
@@ -484,7 +409,7 @@ public static class Decoding
 		return result;
 	}
 
-	internal static List<ShortIntervalList> DecodeBWT(this List<ShortIntervalList> input, List<byte> skipped)
+	public override List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, List<byte> skipped)
 	{
 		Status[0] = 0;
 		StatusMaximum[0] = GetArrayLength(input.Length, BWTBlockSize + BWTBlockExtraSize);
@@ -494,7 +419,7 @@ public static class Decoding
 		{
 			var rle = bytes[i] & ValuesInByte >> 1;
 			bytes2.AddRange(bytes.GetSlice(i..(i += BWTBlockExtraSize)));
-			bytes2.AddRange(rle == 0 ? bytes.DecodeRLEAfterBWT(ref i) : bytes.GetRange(i..Min(i += BWTBlockSize, bytes.Length)));
+			bytes2.AddRange(rle == 0 ? DecodeRLEAfterBWT(bytes, ref i) : bytes.GetRange(i..Min(i += BWTBlockSize, bytes.Length)));
 		}
 		var hs = bytes2.Filter((x, index) => index % (BWTBlockSize + BWTBlockExtraSize) >= BWTBlockExtraSize).ToHashSet().Concat(skipped).Sort().ToHashSet();
 		List<ShortIntervalList> result = new(bytes2.Length);
@@ -506,12 +431,14 @@ public static class Decoding
 			bytes2[i] &= (ValuesInByte >> 1) - 1;
 			var firstPermutation = (int)bytes2.GetSlice(i, BWTBlockExtraSize).Progression(0L, (x, y) => (x << BitsPerByte) + y);
 			i += BWTBlockExtraSize;
-			result.AddRange(bytes2.GetRange(i, length).DecodeBWT2(hs, firstPermutation));
+			result.AddRange(DecodeBWT2(bytes2.GetRange(i, length), hs, firstPermutation));
 		}
 		return result;
 	}
 
-	private static List<ShortIntervalList> DecodeBWT2(this NList<byte> input, ListHashSet<byte> hs, int firstPermutation)
+	protected override List<ShortIntervalList> DecodeBWT2(Slice<ShortIntervalList> input, ListHashSet<byte> hs, int firstPermutation) => DecodeBWT2(input.NConvert(x => (byte)x[0].Lower), hs, firstPermutation);
+
+	protected virtual List<ShortIntervalList> DecodeBWT2(NList<byte> input, ListHashSet<byte> hs, int firstPermutation)
 	{
 		var mtfMemory = hs.ToArray();
 		for (var i = 0; i < input.Length; i++)
@@ -533,7 +460,7 @@ public static class Decoding
 		return result;
 	}
 
-	internal static NList<byte> DecodeRLEAfterBWT(this NList<byte> byteList, ref int i)
+	public virtual NList<byte> DecodeRLEAfterBWT(NList<byte> byteList, ref int i)
 	{
 		NList<byte> result = new();
 		int length, serie, l;
@@ -589,14 +516,4 @@ public static class Decoding
 		}
 		return result;
 	}
-
-	private static uint ReadCount(this ArithmeticDecoder ar, uint maxT = 31)
-	{
-		var temp = (int)ar.ReadEqual(maxT);
-		var read = ar.ReadEqual((uint)1 << Max(temp, 1));
-		return read + ((temp == 0) ? 0 : (uint)1 << Max(temp, 1));
-	}
-
-	private static uint GetBaseWithBuffer(uint oldBase) => oldBase + GetBufferInterval(oldBase);
-	private static uint GetBufferInterval(uint oldBase) => Max((oldBase + 10) / 20, 1);
 }

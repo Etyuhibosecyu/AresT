@@ -79,7 +79,7 @@ internal partial class Compression
 			{
 				var a = 0;
 				var wordsList = tl[0].GetSlice(GetArrayLength(nullIntervals.Length, 8) + 2).Convert(l => encoding2.GetString(tl[1].GetSlice(1)[a..(a += (int)l[0].Lower)].ToArray(x => (byte)x[0].Lower)));
-				return encoding2.GetBytes(tl[2].GetSlice(1).ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => l[1].Lower == 1 ? new List<char>(x).Add(' ') : x.ToList())).DecodeSHET(shet)).Wrap(bl => encoding == 2 && tl[3][0][0].Lower == 1 ? bl.ToNList().Add((byte)tl[3][0][1].Lower) : bl.ToNList());
+				return encoding2.GetBytes(new Decoding().DecodeSHET(tl[2].GetSlice(1).ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => l[1].Lower == 1 ? new List<char>(x).Add(' ') : x.ToList())), shet)).Wrap(bl => encoding == 2 && tl[3][0][0].Lower == 1 ? bl.ToNList().Add((byte)tl[3][0][1].Lower) : bl.ToNList());
 			});
 			for (var i = 0; i < original.Length; i++)
 				if (original[i] != decoded[i])
@@ -98,7 +98,7 @@ internal partial class Compression
 		redundantByte = null;
 		var threadsCount = Environment.ProcessorCount;
 		int[] ansiLetters = new int[threadsCount], utf16Letters = new int[threadsCount], utf8Letters = new int[threadsCount];
-		ListHashSet<int> singleNulls = new(), doubleNulls = new();
+		List<int>[] singleNulls = RedStarLinq.FillArray(threadsCount, _ => new List<int>()), doubleNulls = RedStarLinq.FillArray(threadsCount, _ => new List<int>());
 		if (originalFile.Length == 0)
 		{
 			encoding = 0;
@@ -115,9 +115,9 @@ internal partial class Compression
 		{
 			if (originalFile[i] == 0)
 			{
-				lock (lockObj[i % threadsCount]) singleNulls.Add(i);
+				lock (lockObj[i % threadsCount]) singleNulls[i % threadsCount].Add(i);
 				if (originalFile[i - 1] == 0)
-					lock (lockObj[i % threadsCount]) doubleNulls.Add(i - 1);
+					lock (lockObj[i % threadsCount]) doubleNulls[i % threadsCount].Add(i - 1);
 			}
 			if (originalFile[i] is >= 0xC0 and <= 0xFF)
 				lock (lockObj[i % threadsCount])
@@ -131,9 +131,10 @@ internal partial class Compression
 			Status[tn]++;
 		});
 		int ansiLettersSum = ansiLetters.Sum(), utf16LettersSum = utf16Letters.Sum(), utf8LettersSum = utf8Letters.Sum();
+		ListHashSet<int> singleNullsSum = singleNulls.ConvertAndJoin(x => x).ToHashSet(), doubleNullsSum = doubleNulls.ConvertAndJoin(x => x).ToHashSet();
 		var nullSequenceStart = -1;
-		doubleNulls.FilterInPlace((x, index) => (index == 0 || doubleNulls[index - 1] != x - 1 || (index - nullSequenceStart) % 2 == 0) && (nullSequenceStart = index) >= 0);
-		if (doubleNulls.Length * doubleNulls.Length * 400 >= originalFile.Length)
+		doubleNullsSum.FilterInPlace((x, index) => (index == 0 || doubleNullsSum[index - 1] != x - 1 || (index - nullSequenceStart) % 2 == 0) && (nullSequenceStart = index) >= 0);
+		if (doubleNullsSum.Length * doubleNullsSum.Length * 400 >= originalFile.Length)
 		{
 			encoding = 0;
 			nulls = new();
@@ -142,19 +143,19 @@ internal partial class Compression
 		if ((utf16LettersSum >= (originalFile.Length + 9) / 10 || utf16LettersSum > ansiLettersSum) && utf16LettersSum > utf8LettersSum)
 		{
 			encoding = 1;
-			nulls = doubleNulls;
-			return Encoding.Unicode.GetString(originalFile.Filter((x, index) => !doubleNulls.Contains(index) && !doubleNulls.Contains(index - 1)).ToArray());
+			nulls = doubleNullsSum;
+			return Encoding.Unicode.GetString(originalFile.Filter((x, index) => !doubleNullsSum.Contains(index) && !doubleNullsSum.Contains(index - 1)).ToArray());
 		}
 		else if (utf8LettersSum >= (originalFile.Length + 9) / 10 || utf8LettersSum > ansiLettersSum)
 		{
 			encoding = 2;
-			nulls = doubleNulls;
+			nulls = doubleNullsSum;
 			if (originalFile[^1] >= ValuesInByte >> 1)
 			{
 				redundantByte = originalFile[^1];
-				return Encoding.UTF8.GetString(originalFile.GetSlice(..^1).Filter((x, index) => !doubleNulls.Contains(index) && !doubleNulls.Contains(index - 1)).ToArray());
+				return Encoding.UTF8.GetString(originalFile.GetSlice(..^1).Filter((x, index) => !doubleNullsSum.Contains(index) && !doubleNullsSum.Contains(index - 1)).ToArray());
 			}
-			return Encoding.UTF8.GetString(originalFile.Filter((x, index) => !doubleNulls.Contains(index) && !doubleNulls.Contains(index - 1)).ToArray());
+			return Encoding.UTF8.GetString(originalFile.Filter((x, index) => !doubleNullsSum.Contains(index) && !doubleNullsSum.Contains(index - 1)).ToArray());
 		}
 		else
 		{
@@ -166,8 +167,8 @@ internal partial class Compression
 			}
 			else
 			{
-				nulls = singleNulls;
-				return Encoding.GetEncoding(1251).GetString(originalFile.Filter((x, index) => !singleNulls.Contains(index)).ToArray());
+				nulls = singleNullsSum;
+				return Encoding.GetEncoding(1251).GetString(originalFile.Filter((x, index) => !singleNullsSum.Contains(index)).ToArray());
 			}
 		}
 	}
@@ -195,7 +196,7 @@ internal partial class Compression
 			}
 			else if (state is 7 or 9)
 			{
-				if (Decoding.DecodeSHETChar(text[i]) < (state == 7 ? SHETThreshold1 : SHETThreshold2))
+				if (new Decoding().DecodeSHETChar(text[i]) < (state == 7 ? SHETThreshold1 : SHETThreshold2))
 					state = 2;
 				else
 					state++;

@@ -342,7 +342,7 @@ public static class MainClass
 				bytes = new byte[fragmentLength];
 				rfs.Read(bytes, 0, bytes.Length);
 			}
-			var s = Decoding.Decode(bytes, encodingVersion);
+			var s = new Decoding().Decode(bytes, encodingVersion);
 			wfs.Write(s, 0, s.Length);
 			Supertotal += ProgressBarStep;
 			GC.Collect();
@@ -391,7 +391,7 @@ public static class MainClass
 				bytes = new byte[fragmentLength];
 				rfs.Read(bytes, 0, bytes.Length);
 			}
-			var s = new Executions(Decoding.Decode(bytes, encodingVersion)).Encode();
+			var s = new Executions(new Decoding().Decode(bytes, encodingVersion)).Encode();
 			if (fragmentCount != 1)
 				wfs.Write(new byte[]{ (byte)(s.Length >> (BitsPerByte << 1)), (byte)(s.Length >> BitsPerByte), (byte)s.Length }, 0, 3);
 			wfs.Write(s, 0, s.Length);

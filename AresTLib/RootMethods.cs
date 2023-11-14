@@ -404,7 +404,7 @@ public record class Executions(byte[] OriginalFile)
 	{
 		try
 		{
-			var decoded = Decoding.Decode(compressedFile, ProgramVersion);
+			var decoded = new Decoding().Decode(compressedFile, ProgramVersion);
 			for (var i = 0; i < OriginalFile.Length; i++)
 				if (OriginalFile[i] != decoded[i])
 					throw new DecoderFallbackException();

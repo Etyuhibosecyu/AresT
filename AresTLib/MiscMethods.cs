@@ -112,7 +112,7 @@ internal partial class Compression
 		uniqueElems.ExceptWith(uniqueElems2);
 #if DEBUG
 		var input2 = input.Skip(startPos);
-		var decoded = result.GetRange(startPos).DecodeBWT(uniqueElems.ToList());
+		var decoded = new Decoding().DecodeBWT(result.GetRange(startPos), uniqueElems.ToList());
 		for (var i = 0; i < input2.Length && i < decoded.Length; i++)
 			for (var j = 0; j < input2[i].Length && j < decoded[i].Length; j++)
 			{
@@ -229,7 +229,7 @@ internal partial class Compression
 #if DEBUG
 		var input2 = input;
 		var pos = 0;
-		var decoded = result.DecodeRLEAfterBWT(ref pos);
+		var decoded = new Decoding().DecodeRLEAfterBWT(result, ref pos);
 		for (var i = 0; i < input2.Length && i < decoded.Length; i++)
 		{
 			var x = input2[i];
