@@ -44,12 +44,7 @@ public class Decoding : AresTLib005.Decoding
 			return compressedFile[1..];
 		else if (compressedFile.Length <= 2)
 			throw new DecoderFallbackException();
-		misc = method >= 64 ? method % 64 % 7 : -1;
-		hf = method % 64 % 7;
-		rle = method % 64 % 21 / 7 * 7;
-		lz = method % 64 % 42 / 21 * 21;
-		bwt = method % 64 / 42 * 42;
-		hfw = hf is 2 or 3 or 5 or 6;
+		ProcessMethod(method);
 		if (method != 0 && compressedFile.Length <= 5)
 			throw new DecoderFallbackException();
 		NList<byte> byteList;
@@ -114,22 +109,7 @@ public class Decoding : AresTLib005.Decoding
 			if (repeatsCount > FragmentLength >> 1)
 				throw new DecoderFallbackException();
 		}
-		var (encoding, maxLength, nullsCount) = hfw && n == 0 ? (ar.ReadEqual(3), ar.ReadCount(), ar.ReadCount((uint)BitsCount(FragmentLength))) : (0, 0, 0);
-		if (hfw && n == 0 && nulls != null)
-		{
-			var counter2 = 1;
-			if (maxLength is < 2 or > FragmentLength || nullsCount > FragmentLength)
-				throw new DecoderFallbackException();
-			for (var i = 0; i < nullsCount; i++)
-			{
-				var value = ar.ReadCount((uint)BitsCount(FragmentLength));
-				if (value > FragmentLength)
-					throw new DecoderFallbackException();
-				nulls.Add((int)value + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
-				counter2++;
-			}
-			counter -= GetArrayLength(counter2, 4);
-		}
+		ProcessNulls(ar, nulls, ref counter, out var encoding, out var maxLength);
 		var lz = this.lz;
 		if (lz != 0)
 		{
@@ -177,46 +157,13 @@ public class Decoding : AresTLib005.Decoding
 
 	protected override List<ShortIntervalList> DecodeAdaptive(ArithmeticDecoder ar, List<byte> skipped, LZData lzData, int lz, int counter)
 	{
-		if (bwt != 0 && !(hfw && n != 1))
-		{
-			var skippedCount = (int)ar.ReadCount();
-			var @base = skippedCount == 0 ? 1 : ar.ReadCount();
-			if (skippedCount > @base || @base > FragmentLength)
-				throw new DecoderFallbackException();
-			for (var i = 0; i < skippedCount; i++)
-				skipped.Add((byte)ar.ReadEqual(@base));
-			counter -= skippedCount == 0 ? 1 : (skippedCount + 11) / 8;
-		}
-		var fileBase = ar.ReadCount();
-		if (counter is < 0 or > FragmentLength)
-			throw new DecoderFallbackException();
-		Status[0] = 0;
-		StatusMaximum[0] = counter;
-		SumSet<uint> set = new() { (uint.MaxValue, 1) };
+		DecodeAdaptivePrerequisites(ar, skipped, ref counter, out var fileBase, out var set);
 		SumList lengthsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2))) : new(), distsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1)) : new();
 		var firstIntervalDist = lz != 0 ? (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
-		List<Interval> uniqueList = new();
-		if (lz != 0)
-		{
-			set.Add((fileBase - 1, 1));
-			uniqueList.Add(new(fileBase - 1, fileBase));
-		}
-		List<ShortIntervalList> result = new();
-		var fullLength = 0;
-		uint nextWordLink = 0;
+		DecodeAdaptivePrerequisites2(lz, fileBase, set, out var uniqueList, out var result, out var fullLength, out var nextWordLink);
 		for (; counter > 0; counter--, Status[0]++)
 		{
-			var readIndex = ar.ReadPart(set);
-			if (readIndex == set.Length - 1)
-			{
-				var actualIndex = n == 2 ? nextWordLink++ : ar.ReadEqual(fileBase);
-				if (!set.TryAdd((actualIndex, 1), out readIndex))
-					throw new DecoderFallbackException();
-				uniqueList.Insert(readIndex, new Interval(actualIndex, fileBase));
-			}
-			else
-				set.Increase(uniqueList[readIndex].Lower);
-			set.Update(uint.MaxValue, (int)GetBufferInterval((uint)set.GetLeftValuesSum(uint.MaxValue, out _)));
+			var readIndex = DecodeAdaptiveReadFirst(ar, fileBase, set, uniqueList, ref nextWordLink);
 			if (!(lz != 0 && uniqueList[readIndex].Lower == fileBase - 1))
 			{
 				result.Add(n == 2 ? new() { uniqueList[readIndex], new(ar.ReadEqual(2), 2) } : new() { uniqueList[readIndex] });
