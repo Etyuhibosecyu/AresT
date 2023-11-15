@@ -109,7 +109,7 @@ public class Decoding2
 		List<ShortIntervalList> compressedList;
 		if (hf >= 4)
 		{
-			compressedList = decoding.DecodeAdaptive(ar, skipped, lzData, lz, counter);
+			compressedList = decoding.DecodeAdaptive(skipped, lzData, lz, counter);
 			goto l1;
 		}
 		if (hf != 0)
@@ -165,7 +165,7 @@ public class Decoding2
 			throw new DecoderFallbackException();
 		HuffmanData huffmanData = new(maxFrequency, frequencyCount, arithmeticMap, uniqueList);
 		Current[0] += ProgressBarStep;
-		compressedList = decoding.ReadCompressedList(ar, huffmanData, bwt, lzData, lz, counter, n == 2);
+		compressedList = decoding.ReadCompressedList(huffmanData, bwt, lzData, lz, counter, n == 2);
 	l1:
 		if (hfw && n == 0)
 			compressedList.Add(new() { new(encoding, 3) });

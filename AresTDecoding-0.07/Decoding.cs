@@ -39,18 +39,12 @@ public class Decoding : AresTLib005.Decoding
 				1 => new AresTLib005.Decoding().Decode(compressedFile, encodingVersion),
 				_ => throw new DecoderFallbackException(),
 			};
-		int method = compressedFile[0];
-		if (method == 0)
-			return compressedFile[1..];
-		else if (compressedFile.Length <= 2)
-			throw new DecoderFallbackException();
-		ProcessMethod(method);
-		if (method != 0 && compressedFile.Length <= 5)
-			throw new DecoderFallbackException();
+		if (ProcessMethod(compressedFile) is byte[] bytes)
+			return bytes;
 		NList<byte> byteList;
 		if (misc == 2)
 		{
-			ProcessMisc(compressedFile, out var ar, out _, out var nulls, out var list);
+			ProcessMisc(compressedFile, out _, out var nulls, out var list);
 			byteList = JoinWords(list, nulls);
 		}
 		else if (misc == 1)
@@ -59,7 +53,7 @@ public class Decoding : AresTLib005.Decoding
 		{
 			Current[0] = 0;
 			CurrentMaximum[0] = ProgressBarStep * (bwt != 0 ? (hfw ? 8 : 4) : (hfw ? 7 : 3));
-			using ArithmeticDecoder ar = compressedFile[1..];
+			ar = compressedFile[1..];
 			ListHashSet<int> nulls = new();
 			byteList = hfw ? JoinWords(RedStarLinq.Fill(3, i => new Decoding2(this, ar, nulls, hf, bwt, lz, n = i, hfw, ref repeatsCount).Decode()), nulls) : new Decoding2(this, ar, nulls, hf, bwt, lz, n = 0, hfw, ref repeatsCount).Decode().PNConvert(x => (byte)x[0].Lower);
 		}
@@ -74,7 +68,7 @@ public class Decoding : AresTLib005.Decoding
 		return byteList.Repeat(repeatsCount).ToArray();
 	}
 
-	protected override void ProcessMisc(byte[] compressedFile, out ArithmeticDecoder ar, out uint encoding, out ListHashSet<int> nulls, out List<List<ShortIntervalList>> list)
+	protected override void ProcessMisc(byte[] compressedFile, out uint encoding, out ListHashSet<int> nulls, out List<List<ShortIntervalList>> list)
 	{
 		ar = compressedFile[1..];
 		var repeats = ar.ReadPart(new List<uint>(2, 224, 225));
@@ -98,15 +92,15 @@ public class Decoding : AresTLib005.Decoding
 		Current[0] += ProgressBarStep;
 	}
 
-	public override List<ShortIntervalList> DecodeAdaptive(ArithmeticDecoder ar, List<byte> skipped, LZData lzData, int lz, int counter)
+	public override List<ShortIntervalList> DecodeAdaptive(List<byte> skipped, LZData lzData, int lz, int counter)
 	{
-		DecodeAdaptivePrerequisites(ar, skipped, ref counter, out var fileBase, out var set);
+		DecodeAdaptivePrerequisites(skipped, ref counter, out var fileBase, out var set);
 		SumList lengthsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2))) : new(), distsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1)) : new();
 		var firstIntervalDist = lz != 0 ? (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
 		DecodeAdaptivePrerequisites2(lz, fileBase, set, out var uniqueList, out var result, out var fullLength, out var nextWordLink);
 		for (; counter > 0; counter--, Status[0]++)
 		{
-			var readIndex = DecodeAdaptiveReadFirst(ar, fileBase, set, uniqueList, ref nextWordLink);
+			var readIndex = DecodeAdaptiveReadFirst(fileBase, set, uniqueList, ref nextWordLink);
 			if (!(lz != 0 && uniqueList[readIndex].Lower == fileBase - 1))
 			{
 				result.Add(n == 2 ? new() { uniqueList[readIndex], new(ar.ReadEqual(2), 2) } : new() { uniqueList[readIndex] });
@@ -116,43 +110,52 @@ public class Decoding : AresTLib005.Decoding
 				continue;
 			}
 			result.Add(new() { uniqueList[^1] });
-			uint dist, length, spiralLength = 0;
-			readIndex = ar.ReadPart(lengthsSL);
-			lengthsSL.Increase(readIndex);
-			if (lzData.Length.R == 0)
-				length = (uint)readIndex;
-			else if (lzData.Length.R == 1)
-			{
-				length = (uint)readIndex;
-				if (length == lzData.Length.Threshold + 1)
-					length += ar.ReadEqual(lzData.Length.Max - lzData.Length.Threshold);
-			}
-			else
-			{
-				length = (uint)readIndex + lzData.Length.Threshold;
-				if (length == lzData.Length.Max + 1)
-					length = ar.ReadEqual(lzData.Length.Threshold);
-			}
+			ProcessLZLength(lzData, lengthsSL, out readIndex, out var length);
 			result[^1].Add(new(length, lzData.Length.Max + 1));
-			var maxDist = Min(lzData.Dist.Max, (uint)(fullLength - length - 2));
-			readIndex = ar.ReadPart(distsSL);
-			distsSL.Increase(readIndex);
-			if (lzData.Dist.R == 0 || maxDist < lzData.Dist.Threshold)
-				dist = (uint)readIndex;
-			else if (lzData.Dist.R == 1)
-			{
-				dist = (uint)readIndex;
-				if (dist == lzData.Dist.Threshold + 1)
-					dist += ar.ReadEqual(maxDist - lzData.Dist.Threshold + lzData.UseSpiralLengths);
-			}
-			else
-				dist = (uint)readIndex;
-			ProcessAdaptiveDist(ar, lzData, result, ref fullLength, dist, length, ref spiralLength, maxDist);
+			ProcessLZDist(lzData, distsSL, fullLength, out readIndex, out var dist, length, out var maxDist);
+			ProcessAdaptiveDist(lzData, result, ref fullLength, dist, length, out var spiralLength, maxDist);
 			if (lz != 0 && distsSL.Length < firstIntervalDist)
 				new Chain((int)Min(firstIntervalDist - distsSL.Length, (length + 2) * (spiralLength + 1))).ForEach(x => distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1));
 		}
 		Current[0] += ProgressBarStep;
 		return result.DecodeLempelZiv(lz != 0, 0, 0, 0, 0, lzData.UseSpiralLengths, 0, 0, 0);
+	}
+
+	private void ProcessLZLength(LZData lzData, SumList lengthsSL, out int readIndex, out uint length)
+	{
+		readIndex = ar.ReadPart(lengthsSL);
+		lengthsSL.Increase(readIndex);
+		if (lzData.Length.R == 0)
+			length = (uint)readIndex;
+		else if (lzData.Length.R == 1)
+		{
+			length = (uint)readIndex;
+			if (length == lzData.Length.Threshold + 1)
+				length += ar.ReadEqual(lzData.Length.Max - lzData.Length.Threshold);
+		}
+		else
+		{
+			length = (uint)readIndex + lzData.Length.Threshold;
+			if (length == lzData.Length.Max + 1)
+				length = ar.ReadEqual(lzData.Length.Threshold);
+		}
+	}
+
+	protected virtual void ProcessLZDist(LZData lzData, SumList distsSL, int fullLength, out int readIndex, out uint dist, uint length, out uint maxDist)
+	{
+		maxDist = Min(lzData.Dist.Max, (uint)(fullLength - length - 2));
+		readIndex = ar.ReadPart(distsSL);
+		distsSL.Increase(readIndex);
+		if (lzData.Dist.R == 0 || maxDist < lzData.Dist.Threshold)
+			dist = (uint)readIndex;
+		else if (lzData.Dist.R == 1)
+		{
+			dist = (uint)readIndex;
+			if (dist == lzData.Dist.Threshold + 1)
+				dist += ar.ReadEqual(maxDist - lzData.Dist.Threshold + lzData.UseSpiralLengths);
+		}
+		else
+			dist = (uint)readIndex;
 	}
 
 	public override List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, List<byte> skipped)
