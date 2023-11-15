@@ -18,6 +18,7 @@ global using ArithmeticDecoder = AresGlobalMethods005.ArithmeticDecoder;
 global using HuffmanData = AresGlobalMethods005.HuffmanData;
 global using MethodDataUnit = AresGlobalMethods005.MethodDataUnit;
 global using LZData = AresGlobalMethods005.LZData;
+global using PPM = AresTLib007.PPM;
 using System.Text.RegularExpressions;
 
 namespace AresTLib;
@@ -101,14 +102,14 @@ public class Decoding : AresTLib007.Decoding
 			byteList = JoinWords(list, nulls, misc == 3);
 		}
 		else if (misc == 1)
-			byteList = DecodePPM(compressedFile[1..], ValuesInByte).PNConvert(x => (byte)x[0].Lower);
+			byteList = new PPM(this, compressedFile[1..], ValuesInByte, ref repeatsCount).Decode().PNConvert(x => (byte)x[0].Lower);
 		else if (hf + lz + bwt != 0)
 		{
 			Current[0] = 0;
 			CurrentMaximum[0] = ProgressBarStep * (bwt != 0 ? (hfw ? 8 : 4) : (hfw ? 7 : 3));
 			using ArithmeticDecoder ar = compressedFile[1..];
 			ListHashSet<int> nulls = new();
-			byteList = hfw ? JoinWords(ProcessUTF8(CreateVar(RedStarLinq.Fill(3, i => (n = i, Decode2(ar, nulls)).Item2), out var list), ar, list[0][^1][0].Lower == 2), nulls, hf is 3 or 6) : Decode2(ar).PNConvert(x => (byte)x[0].Lower);
+			byteList = hfw ? JoinWords(ProcessUTF8(CreateVar(RedStarLinq.Fill(3, i => new Decoding2(this, ar, nulls, hf, bwt, lz, n = i, hfw, ref repeatsCount).Decode()), out var list), ar, list[0][^1][0].Lower == 2), nulls, hf is 3 or 6) : new Decoding2(this, ar, nulls, hf, bwt, lz, n = 0, hfw, ref repeatsCount).Decode().PNConvert(x => (byte)x[0].Lower);
 		}
 		else
 			byteList = compressedFile.GetSlice(1).ToNList();
@@ -147,73 +148,9 @@ public class Decoding : AresTLib007.Decoding
 		return result;
 	});
 
-	protected override List<ShortIntervalList> Decode2(ArithmeticDecoder ar, ListHashSet<int> nulls = default!)
-	{
-		var counter = (int)ar.ReadCount() - (hfw && n == 0 ? 2 : 1);
-		uint lzRDist, lzMaxDist, lzThresholdDist = 0, lzRLength, lzMaxLength, lzThresholdLength = 0, lzUseSpiralLengths = 0, lzRSpiralLength, lzMaxSpiralLength, lzThresholdSpiralLength = 0;
-		MethodDataUnit lzDist = new(), lzLength = new(), lzSpiralLength = new();
-		int maxFrequency = 0, frequencyCount = 0;
-		List<uint> arithmeticMap = new();
-		List<Interval> uniqueList = new();
-		List<byte> skipped = new();
-		if (n == 0)
-		{
-			var repeats = ar.ReadPart(new List<uint>(2, 224, 225));
-			repeatsCount = repeats == 0 ? 1 : (int)ar.ReadCount() + 2;
-			if (repeatsCount > GetFragmentLength() >> 1)
-				throw new DecoderFallbackException();
-		}
-		ProcessNulls(ar, nulls, ref counter, out var encoding, out var maxLength);
-		var lz = this.lz;
-		if (lz != 0)
-		{
-			var counter2 = 7;
-			lzRDist = ar.ReadEqual(3);
-			lzMaxDist = ar.ReadCount();
-			if (lzRDist != 0)
-			{
-				lzThresholdDist = ar.ReadEqual(lzMaxDist + 1);
-				counter2++;
-			}
-			lzDist = new(lzRDist, lzMaxDist, lzThresholdDist);
-			lzRLength = ar.ReadEqual(3);
-			lzMaxLength = ar.ReadCount(16);
-			if (lzRLength != 0)
-			{
-				lzThresholdLength = ar.ReadEqual(lzMaxLength + 1);
-				counter2++;
-			}
-			lzLength = new(lzRLength, lzMaxLength, lzThresholdLength);
-			if (lzMaxDist == 0 && lzMaxLength == 0 && ar.ReadEqual(2) == 0)
-			{
-				lz = 0;
-				goto l0;
-			}
-			lzUseSpiralLengths = ar.ReadEqual(2);
-			if (lzUseSpiralLengths == 1)
-			{
-				lzRSpiralLength = ar.ReadEqual(3);
-				lzMaxSpiralLength = ar.ReadCount(16);
-				counter2 += 3;
-				if (lzRSpiralLength != 0)
-				{
-					lzThresholdSpiralLength = ar.ReadEqual(lzMaxSpiralLength + 1);
-					counter2++;
-				}
-				lzSpiralLength = new(lzRSpiralLength, lzMaxSpiralLength, lzThresholdSpiralLength);
-			}
-		l0:
-			counter -= GetArrayLength(counter2, 8);
-		}
-		LZData lzData = new(lzDist, lzLength, lzUseSpiralLengths, lzSpiralLength);
-		return ProcessHuffman(ar, ref maxFrequency, ref frequencyCount, arithmeticMap, uniqueList, skipped, encoding, maxLength, lzData, lz, ref counter);
-	}
+	public override uint GetFragmentLength() => FragmentLength;
 
-	protected override uint GetFragmentLength() => FragmentLength;
-
-	protected override uint GetHuffmanBase(uint oldBase) => GetBaseWithBuffer(oldBase, hfw);
-
-	protected override List<ShortIntervalList> DecodeAdaptive(ArithmeticDecoder ar, List<byte> skipped, LZData lzData, int lz, int counter)
+	public override List<ShortIntervalList> DecodeAdaptive(ArithmeticDecoder ar, List<byte> skipped, LZData lzData, int lz, int counter)
 	{
 		DecodeAdaptivePrerequisites(ar, skipped, ref counter, out var fileBase, out var set);
 		SumList lengthsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2))) : new(), distsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1)) : new();
@@ -293,7 +230,7 @@ public class Decoding : AresTLib007.Decoding
 
 	protected override void DecodeAdaptiveFirstUpdateSet(SumSet<uint> set) => set.Update(uint.MaxValue, Max(set.Length - 1, 1));
 
-	protected override List<ShortIntervalList> ReadCompressedList(ArithmeticDecoder ar, HuffmanData huffmanData, int bwt, LZData lzData, int lz, int counter, bool spaceCodes)
+	public override List<ShortIntervalList> ReadCompressedList(ArithmeticDecoder ar, HuffmanData huffmanData, int bwt, LZData lzData, int lz, int counter, bool spaceCodes)
 	{
 		Status[0] = 0;
 		StatusMaximum[0] = counter;

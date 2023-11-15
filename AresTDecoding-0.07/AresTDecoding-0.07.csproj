@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
-    <RootNamespace>AresTLib</RootNamespace>
+    <RootNamespace>AresTLib007</RootNamespace>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
