@@ -36,6 +36,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mpir.NET", "..\Corlib.NStar
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AresGlobalDecoding-0.075", "..\AresGlobal\AresGlobalDecoding-0.075\AresGlobalDecoding-0.075.csproj", "{B0D252CC-3823-473F-BE90-888CC9955919}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AresTTests", "AresTTests\AresTTests.csproj", "{4A000746-BBE0-4211-ADAA-84248B242A02}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -100,6 +102,10 @@ Global
 		{B0D252CC-3823-473F-BE90-888CC9955919}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B0D252CC-3823-473F-BE90-888CC9955919}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B0D252CC-3823-473F-BE90-888CC9955919}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4A000746-BBE0-4211-ADAA-84248B242A02}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4A000746-BBE0-4211-ADAA-84248B242A02}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4A000746-BBE0-4211-ADAA-84248B242A02}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4A000746-BBE0-4211-ADAA-84248B242A02}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

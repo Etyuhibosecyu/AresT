@@ -38,7 +38,7 @@ public static class MainClass
 		Connect(port);
 	}
 
-	public static void Connect(int port)
+	private static void Connect(int port)
 	{
 		IPEndPoint ipe = new(IPAddress.Loopback, port); //IP с номером порта
 		client = new(); //подключение клиента
@@ -57,7 +57,7 @@ public static class MainClass
 			SendMessage();
 	}
 
-	public static void SendMessage()
+	private static void SendMessage()
 	{
 		try
 		{
@@ -79,7 +79,7 @@ public static class MainClass
 		}
 	}
 
-	public static void ReceiveData()
+	private static void ReceiveData()
 	{
 		var receiveLen = new byte[4];
 		byte[] receiveMessage;
@@ -104,7 +104,7 @@ public static class MainClass
 		}
 	}
 
-	public static void WorkUpReceiveMessage(byte[] message)
+	private static void WorkUpReceiveMessage(byte[] message)
 	{
 		try
 		{
@@ -140,7 +140,7 @@ public static class MainClass
 		}
 	}
 
-	private static void MainThread(string filename, string filename2, Action<FileStream, FileStream> action)
+	public static void MainThread(string filename, string filename2, Action<FileStream, FileStream> action, bool send = true)
 	{
 		var tempFilename = "";
 		try
@@ -160,7 +160,8 @@ public static class MainClass
 			{
 				isWorking = false;
 				toSend = new byte[] { 1 };
-				SendMessage();
+				if (send)
+					SendMessage();
 			}
 		}
 		catch (DecoderFallbackException)
@@ -169,7 +170,10 @@ public static class MainClass
 			{
 				isWorking = false;
 				toSend = new byte[] { (byte)(action == Compress ? 3 : 2) };
-				SendMessage();
+				if (send)
+					SendMessage();
+				else
+					throw;
 			}
 		}
 		catch
@@ -178,7 +182,10 @@ public static class MainClass
 			{
 				isWorking = false;
 				toSend = new byte[] { 2 };
-				SendMessage();
+				if (send)
+					SendMessage();
+				else
+					throw;
 			}
 		}
 		finally
@@ -231,7 +238,7 @@ public static class MainClass
 		Environment.Exit(0); //завершение процесса
 	}
 
-	private static void Compress(FileStream rfs, FileStream wfs)
+	public static void Compress(FileStream rfs, FileStream wfs)
 	{
 		var bytes = Array.Empty<byte>();
 		if (continue_)

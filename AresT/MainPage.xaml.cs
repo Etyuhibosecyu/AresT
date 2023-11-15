@@ -582,12 +582,16 @@ public partial class MainPage : ContentPage
 	private void CheckBoxLZ1_CheckedChanged(object? sender, EventArgs e)
 	{
 		usedMethods ^= UsedMethods.LZ1;
+		if (CheckBoxHF1 != null && !CheckBoxHF1.IsChecked && CheckBoxLZ1 != null && !CheckBoxLZ1.IsChecked)
+			CheckBoxHF1.IsChecked = true;
 		SendUsedMethods();
 	}
 
 	private void CheckBoxHF1_CheckedChanged(object? sender, EventArgs e)
 	{
 		usedMethods ^= UsedMethods.HF1;
+		if (CheckBoxHF1 != null && !CheckBoxHF1.IsChecked && CheckBoxLZ1 != null && !CheckBoxLZ1.IsChecked)
+			CheckBoxLZ1.IsChecked = true;
 		SendUsedMethods();
 	}
 

@@ -48,20 +48,20 @@ public class Decoding
 		if (misc == 2)
 		{
 			using ArithmeticDecoder arPPM = compressedFile[1..];
-			var (encoding, maxLength, nullCount) = (arPPM.ReadEqual(3), arPPM.ReadCount(), arPPM.ReadCount((uint)BitsCount(FragmentLength)));
-			if (maxLength is < 2 or > FragmentLength || nullCount > FragmentLength)
+			var (encoding, maxLength, nullCount) = (arPPM.ReadEqual(3), arPPM.ReadCount(), arPPM.ReadCount((uint)BitsCount(GetFragmentLength())));
+			if (maxLength < 2 || maxLength > GetFragmentLength() || nullCount > GetFragmentLength())
 				throw new DecoderFallbackException();
 			ListHashSet<int> nulls = new();
 			for (var i = 0; i < nullCount; i++)
-				nulls.Add((int)arPPM.ReadCount((uint)BitsCount(FragmentLength)) + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
+				nulls.Add((int)arPPM.ReadCount((uint)BitsCount(GetFragmentLength())) + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
 			Current[0] = 0;
 			CurrentMaximum[0] = ProgressBarStep * 5;
-			List<List<ShortIntervalList>> list = DecodePPM(arPPM, maxLength);
+			List<List<ShortIntervalList>> list = DecodePPM(arPPM, maxLength, 0);
 			list[0].Add(new() { new(encoding, 3) });
 			Current[0] += ProgressBarStep;
-			list.Add(DecodePPM(arPPM, ValuesInByte));
+			list.Add(DecodePPM(arPPM, ValuesInByte, 1));
 			Current[0] += ProgressBarStep;
-			list.Add(DecodePPM(arPPM, (uint)list[0].Length - 1, true));
+			list.Add(DecodePPM(arPPM, (uint)list[0].Length - 1, 2));
 			Current[0] += ProgressBarStep;
 			byteList = JoinWords(list, nulls);
 		}
@@ -170,12 +170,12 @@ public class Decoding
 		if (hfw && n == 0 && nulls != null)
 		{
 			var counter2 = 1;
-			if (maxLength is < 2 or > FragmentLength || nullsCount > FragmentLength)
+			if (maxLength < 2 || maxLength > GetFragmentLength() || nullsCount > GetFragmentLength())
 				throw new DecoderFallbackException();
 			for (var i = 0; i < nullsCount; i++)
 			{
-				var value = ar.ReadCount((uint)BitsCount(FragmentLength));
-				if (value > FragmentLength)
+				var value = ar.ReadCount((uint)BitsCount(GetFragmentLength()));
+				if (value > GetFragmentLength())
 					throw new DecoderFallbackException();
 				nulls.Add((int)value + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
 				counter2++;
@@ -199,7 +199,7 @@ public class Decoding
 			var counter2 = 4;
 			maxFrequency = (int)ar.ReadCount() + 1;
 			frequencyCount = (int)ar.ReadCount() + 1;
-			if (maxFrequency > FragmentLength || frequencyCount > FragmentLength)
+			if (maxFrequency > GetFragmentLength() || frequencyCount > GetFragmentLength())
 				throw new DecoderFallbackException();
 			Status[0] = 0;
 			StatusMaximum[0] = frequencyCount;
@@ -243,7 +243,7 @@ public class Decoding
 			if (lz != 0)
 				arithmeticMap.Add(GetHuffmanBase(ValuesInByte));
 		}
-		if (counter is < 0 or > FragmentLength + FragmentLength / 1000)
+		if (counter is < 0 || counter > GetFragmentLength() + GetFragmentLength() / 1000)
 			throw new DecoderFallbackException();
 		HuffmanData huffmanData = new(maxFrequency, frequencyCount, arithmeticMap, uniqueList);
 		Current[0] += ProgressBarStep;
@@ -325,14 +325,14 @@ public class Decoding
 		{
 			var skippedCount = (int)ar.ReadCount();
 			var @base = skippedCount == 0 ? 1 : ar.ReadCount();
-			if (skippedCount > @base || @base > FragmentLength)
+			if (skippedCount > @base || @base > GetFragmentLength())
 				throw new DecoderFallbackException();
 			for (var i = 0; i < skippedCount; i++)
 				skipped.Add((byte)ar.ReadEqual(@base));
 			counter -= skippedCount == 0 ? 1 : (skippedCount + 11) / 8;
 		}
 		fileBase = ar.ReadCount();
-		if (counter < 0 || counter > FragmentLength + (bwt == 0 ? 0 : FragmentLength >> 8))
+		if (counter < 0 || counter > GetFragmentLength() + (bwt == 0 ? 0 : GetFragmentLength() >> 8))
 			throw new DecoderFallbackException();
 		Status[0] = 0;
 		StatusMaximum[0] = counter;
@@ -476,27 +476,21 @@ public class Decoding
 		return result;
 	}
 
-	protected virtual List<ShortIntervalList> DecodePPM(ArithmeticDecoder ar, uint inputBase, bool spaces = false)
+	protected virtual List<ShortIntervalList> DecodePPM(ArithmeticDecoder ar, uint inputBase, int n = -1)
 	{
-		uint counter = ar.ReadCount(), dicsize = ar.ReadCount();
-		if (counter is < 0 or > FragmentLength || dicsize is < 0 or > FragmentLength)
-			throw new DecoderFallbackException();
-		Status[0] = 0;
-		StatusMaximum[0] = (int)counter;
-		List<ShortIntervalList> result = new();
-		SumSet<uint> globalSet = new(), newItemsSet = spaces ? new() : new(new Chain((int)inputBase).Convert(x => ((uint)x, 1)));
-		var maxDepth = 12;
-		var comparer = new NListEComparer<uint>();
-		FastDelHashSet<NList<uint>> contextHS = new(comparer);
-		List<SumSet<uint>> sumSets = new();
-		List<uint> preLZMap = new(2, 1, 2), spacesMap = new(2, 1, 2);
-		uint nextWordLink = 0;
+		DecodePPMPrerequisites(ar, inputBase, n, out var counter, out var dicsize, out var result, out var globalSet, out var newItemsSet, out var maxDepth, out var contextHS, out var sumSets, out var preLZMap, out var spacesMap, out var nextWordLink, out var lzLengthsSL);
+		NList<uint> context = new(maxDepth);
+		NList<uint> context2 = new(maxDepth);
+		SumSet<uint> set = new();
+		SumSet<uint> excludingSet = new();
 		for (; (int)counter > 0; counter--, Status[0]++)
 		{
-			var context = result.GetSlice(Max(result.Length - maxDepth, 0)..).NConvert(x => x[0].Lower).Reverse();
-			var context2 = context.Copy();
+			result.GetSlice(Max(result.Length - maxDepth, 0)..).ForEach((x, index) => context.SetOrAdd(index, x[0].Lower));
+			context.Reverse();
+			context2.Replace(context);
 			var index = -1;
-			SumSet<uint>? set = null, excludingSet = new();
+			set.Clear();
+			excludingSet.Clear();
 			uint item;
 			if (context.Length == maxDepth && counter > maxDepth)
 			{
@@ -513,22 +507,24 @@ public class Decoding
 			}
 			for (; context.Length > 0 && !contextHS.TryGetIndexOf(context, out index); context.RemoveAt(^1)) ;
 			var arithmeticIndex = -1;
-			for (; context.Length > 0 && contextHS.TryGetIndexOf(context, out index) && (arithmeticIndex = (set = sumSets[index].Copy().ExceptWith(excludingSet)).Length == 0 ? 1 : ar.ReadPart(new List<uint>(2, (uint)set.ValuesSum, (uint)(set.ValuesSum + set.Length * 100)))) == 1; context.RemoveAt(^1), excludingSet.UnionWith(set)) ;
-			if (set == null || context.Length == 0)
+			for (; context.Length > 0 && contextHS.TryGetIndexOf(context, out index) && (arithmeticIndex = set.Replace(sumSets[index]).ExceptWith(excludingSet).Length == 0 ? 1 : ar.ReadPart(new List<uint>(2, (uint)set.ValuesSum, (uint)(set.ValuesSum + set.Length * 100)))) == 1; context.RemoveAt(^1), excludingSet.UnionWith(set)) ;
+			if (set.Length == 0 || context.Length == 0)
 			{
-				set = globalSet.Copy().ExceptWith(excludingSet);
-				if (set.Length != 0 && (arithmeticIndex = ar.ReadPart(new List<uint>(2, (uint)set.ValuesSum, (uint)(set.ValuesSum + set.Length * 100)))) != 1)
+				excludingSet.IntersectWith(globalSet).ForEach(x => excludingSet.Update(x.Key, globalSet.TryGetValue(x.Key, out var newValue) ? newValue : throw new EncoderFallbackException()));
+				var set2 = globalSet.ExceptWith(excludingSet);
+				if (set2.Length != 0 && (arithmeticIndex = ar.ReadPart(new List<uint>(2, (uint)set2.ValuesSum, (uint)(set2.ValuesSum + set2.Length * 100)))) != 1)
 				{
-					if (set.Length != 0) arithmeticIndex = ar.ReadPart(set);
-					item = set[arithmeticIndex].Key;
+					if (set2.Length != 0) arithmeticIndex = ar.ReadPart(set2);
+					item = set2[arithmeticIndex].Key;
 				}
-				else if (spaces)
+				else if (n == 2)
 					item = nextWordLink++;
 				else
 				{
 					item = newItemsSet[ar.ReadPart(newItemsSet)].Key;
 					newItemsSet.RemoveValue(item);
 				}
+				globalSet.UnionWith(excludingSet);
 			}
 			else
 			{
@@ -536,42 +532,37 @@ public class Decoding
 				item = set[arithmeticIndex].Key;
 			}
 			result.Add(new() { new(item, inputBase) });
-			if (spaces)
+			if (n == 2)
 			{
 				var space = (uint)ar.ReadPart(spacesMap);
 				result[^1].Add(new(space, 2));
 				spacesMap[0] += 1 - space;
 				spacesMap[1]++;
 			}
-			Increase(context2, item);
-			context.Dispose();
-			context2.Dispose();
+			Increase(context2, context, item);
 		}
 		void ProcessLZ(int curPos)
 		{
 			var dist = ar.ReadEqual(Min((uint)result.Length, dicsize - 1));
 			var oldPos = (int)(result.Length - dist - 2);
-			if (!ar.ReadFibonacci(out var length) || length + maxDepth - 1 > counter)
-				throw new DecoderFallbackException();
+			var length = PPMLZProcessLength(ar, counter, maxDepth, lzLengthsSL);
 			for (var i = 0; i < length + maxDepth - 1; i++)
 			{
 				result.Add(result[oldPos + i]);
-				Increase(result.GetSlice(result.Length - maxDepth - 1, maxDepth).NConvert(x => x[0].Lower).Reverse(), result[^1][0].Lower);
+				Increase(result.GetSlice(result.Length - maxDepth - 1, maxDepth).NConvert(x => x[0].Lower).Reverse(), context, result[^1][0].Lower);
 			}
 			preLZMap[1]++;
 			var decrease = length + maxDepth - 2;
 			counter -= (uint)decrease;
 			Status[0] += (int)decrease;
 		}
-		void Increase(NList<uint> context, uint item)
+		void Increase(NList<uint> context, NList<uint> successContext, uint item)
 		{
-			for (; context.Length > 0 && !contextHS.TryGetIndexOf(context, out var index); context.RemoveAt(^1))
-			{
-				contextHS.TryAdd(context.Copy(), out index);
+			for (; context.Length > 0 && contextHS.TryAdd(context.Copy(), out var index); context.RemoveAt(^1))
 				sumSets.SetOrAdd(index, new() { (item, 100) });
-			}
 			var successLength = context.Length;
-			for (; context.Length > 0 && contextHS.TryGetIndexOf(context, out var index); context.RemoveAt(^1))
+			_ = context.Length == 0 ? null : successContext.Replace(context).RemoveAt(^1);
+			for (; context.Length > 0 && contextHS.TryGetIndexOf(context, out var index); context.RemoveAt(^1), _ = context.Length == 0 ? null : successContext.RemoveAt(^1))
 			{
 				if (!sumSets[index].TryGetValue(item, out var itemValue))
 				{
@@ -583,7 +574,6 @@ public class Decoding
 					sumSets[index].Update(item, itemValue + (int)Max(Round((double)100 / (successLength - context.Length + 1)), 1));
 					continue;
 				}
-				var successContext = context.Copy().RemoveAt(^1);
 				var successIndex = contextHS.IndexOf(successContext);
 				if (!sumSets[successIndex].TryGetValue(item, out var successValue))
 					successValue = 100;
@@ -596,6 +586,34 @@ public class Decoding
 				globalSet.Add(item, 100);
 		}
 		return result;
+	}
+
+	protected virtual void DecodePPMPrerequisites(ArithmeticDecoder ar, uint inputBase, int n, out uint counter, out uint dicsize, out List<ShortIntervalList> result, out SumSet<uint> globalSet, out SumSet<uint> newItemsSet, out int maxDepth, out FastDelHashSet<NList<uint>> contextHS, out List<SumSet<uint>> sumSets, out List<uint> preLZMap, out List<uint> spacesMap, out uint nextWordLink, out SumList lzLengthsSL)
+	{
+		counter = ar.ReadCount();
+		dicsize = ar.ReadCount();
+		if (counter < 0 || counter > GetFragmentLength() || dicsize < 0 || dicsize > GetFragmentLength())
+			throw new DecoderFallbackException();
+		Status[0] = 0;
+		StatusMaximum[0] = (int)counter;
+		result = new();
+		globalSet = new();
+		newItemsSet = n == 2 ? new() : new(new Chain((int)inputBase).Convert(x => ((uint)x, 1)));
+		maxDepth = 12;
+		var comparer = n == 2 ? (G.IEqualityComparer<NList<uint>>)new NListEComparer<uint>() : new EComparer<NList<uint>>((x, y) => x.Equals(y), x => (int)x.Progression((uint)x.Length, (x, y) => (x << 7 | x >> BitsPerInt - 7) ^ (uint)y.GetHashCode()));
+		contextHS = new(comparer);
+		sumSets = new();
+		preLZMap = new(2, 1, 2);
+		spacesMap = new(2, 1, 2);
+		nextWordLink = 0;
+		lzLengthsSL = default!;
+	}
+
+	protected virtual uint PPMLZProcessLength(ArithmeticDecoder ar, uint counter, int maxDepth, SumList lzLengthsSL = default!)
+	{
+		if (!ar.ReadFibonacci(out var length) || length + maxDepth - 1 > counter)
+			throw new DecoderFallbackException();
+		return length;
 	}
 
 	public virtual List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, List<byte> skipped)
