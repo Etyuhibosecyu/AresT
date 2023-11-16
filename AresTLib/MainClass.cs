@@ -309,7 +309,7 @@ public static class MainClass
 		}
 	}
 
-	private static void Decompress(FileStream rfs, FileStream wfs)
+	public static void Decompress(FileStream rfs, FileStream wfs)
 	{
 		var readByte = (byte)rfs.ReadByte();
 		var encodingVersion = (byte)(readByte & 63);

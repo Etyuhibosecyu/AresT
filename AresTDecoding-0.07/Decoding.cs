@@ -92,36 +92,7 @@ public class Decoding : AresTLib005.Decoding
 		Current[0] += ProgressBarStep;
 	}
 
-	public override List<ShortIntervalList> DecodeAdaptive(List<byte> skipped, LZData lzData, int lz, int counter)
-	{
-		DecodeAdaptivePrerequisites(skipped, ref counter, out var fileBase, out var set);
-		SumList lengthsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2))) : new(), distsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1)) : new();
-		var firstIntervalDist = lz != 0 ? (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
-		DecodeAdaptivePrerequisites2(lz, fileBase, set, out var uniqueList, out var result, out var fullLength, out var nextWordLink);
-		for (; counter > 0; counter--, Status[0]++)
-		{
-			var readIndex = DecodeAdaptiveReadFirst(fileBase, set, uniqueList, ref nextWordLink);
-			if (!(lz != 0 && uniqueList[readIndex].Lower == fileBase - 1))
-			{
-				result.Add(n == 2 ? new() { uniqueList[readIndex], new(ar.ReadEqual(2), 2) } : new() { uniqueList[readIndex] });
-				fullLength++;
-				if (lz != 0 && distsSL.Length < firstIntervalDist)
-					distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1);
-				continue;
-			}
-			result.Add(new() { uniqueList[^1] });
-			ProcessLZLength(lzData, lengthsSL, out readIndex, out var length);
-			result[^1].Add(new(length, lzData.Length.Max + 1));
-			ProcessLZDist(lzData, distsSL, fullLength, out readIndex, out var dist, length, out var maxDist);
-			ProcessAdaptiveDist(lzData, result, ref fullLength, dist, length, out var spiralLength, maxDist);
-			if (lz != 0 && distsSL.Length < firstIntervalDist)
-				new Chain((int)Min(firstIntervalDist - distsSL.Length, (length + 2) * (spiralLength + 1))).ForEach(x => distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1));
-		}
-		Current[0] += ProgressBarStep;
-		return result.DecodeLempelZiv(lz != 0, 0, 0, 0, 0, lzData.UseSpiralLengths, 0, 0, 0);
-	}
-
-	private void ProcessLZLength(LZData lzData, SumList lengthsSL, out int readIndex, out uint length)
+	public virtual void ProcessLZLength(LZData lzData, SumList lengthsSL, out int readIndex, out uint length)
 	{
 		readIndex = ar.ReadPart(lengthsSL);
 		lengthsSL.Increase(readIndex);
@@ -141,7 +112,7 @@ public class Decoding : AresTLib005.Decoding
 		}
 	}
 
-	protected virtual void ProcessLZDist(LZData lzData, SumList distsSL, int fullLength, out int readIndex, out uint dist, uint length, out uint maxDist)
+	public virtual void ProcessLZDist(LZData lzData, SumList distsSL, int fullLength, out int readIndex, out uint dist, uint length, out uint maxDist)
 	{
 		maxDist = Min(lzData.Dist.Max, (uint)(fullLength - length - 2));
 		readIndex = ar.ReadPart(distsSL);

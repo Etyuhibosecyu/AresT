@@ -9,6 +9,7 @@ public class Decoding2
 	protected int maxFrequency, frequencyCount, hf, bwt, lz, counter, n;
 	protected uint encoding, maxLength, lzRDist, lzMaxDist, lzThresholdDist, lzRLength, lzMaxLength, lzThresholdLength, lzUseSpiralLengths, lzRSpiralLength, lzMaxSpiralLength, lzThresholdSpiralLength;
 	protected MethodDataUnit lzDist = new(), lzLength = new(), lzSpiralLength = new();
+	protected LZData lzData = default!;
 	protected List<uint> arithmeticMap = default!;
 	protected List<Interval> uniqueList = default!;
 	protected List<byte> skipped = default!;
@@ -80,8 +81,8 @@ public class Decoding2
 		l0:
 			counter -= GetArrayLength(counter2, 8);
 		}
-		LZData lzData = (lzDist, lzLength, lzUseSpiralLengths, lzSpiralLength);
-		return ProcessHuffman(lzData);
+		lzData = (lzDist, lzLength, lzUseSpiralLengths, lzSpiralLength);
+		return ProcessHuffman();
 	}
 
 	protected virtual void ProcessNulls()
@@ -104,12 +105,12 @@ public class Decoding2
 		}
 	}
 
-	protected virtual List<ShortIntervalList> ProcessHuffman(LZData lzData)
+	protected virtual List<ShortIntervalList> ProcessHuffman()
 	{
 		List<ShortIntervalList> compressedList;
 		if (hf >= 4)
 		{
-			compressedList = decoding.DecodeAdaptive(skipped, lzData, lz, counter);
+			compressedList = DecodeAdaptive();
 			goto l1;
 		}
 		if (hf != 0)
@@ -178,6 +179,8 @@ public class Decoding2
 			Current[0] += ProgressBarStep;
 		return compressedList;
 	}
+
+	protected virtual List<ShortIntervalList> DecodeAdaptive() => new AdaptiveHuffmanDec(decoding, ar, skipped, lzData, lz, bwt, n, counter, hfw).Decode();
 
 	protected virtual uint GetHuffmanBase(uint oldBase) => GetBaseWithBuffer(oldBase);
 }

@@ -56,7 +56,9 @@ public class Decoding2 : AresTLib005.Decoding2
 		l0:
 			counter -= GetArrayLength(counter2, 8);
 		}
-		LZData lzData = new(lzDist, lzLength, lzUseSpiralLengths, lzSpiralLength);
-		return ProcessHuffman(lzData);
+		lzData = new(lzDist, lzLength, lzUseSpiralLengths, lzSpiralLength);
+		return ProcessHuffman();
 	}
+
+	protected override List<ShortIntervalList> DecodeAdaptive() => new AdaptiveHuffmanDec(decoding as Decoding ?? throw new InvalidOperationException(), ar, skipped, lzData, lz, bwt, n, counter, hfw).Decode();
 }

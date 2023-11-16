@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
-    <RootNamespace>AresTDecoding_0._09</RootNamespace>
+    <RootNamespace>AresTLib</RootNamespace>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
