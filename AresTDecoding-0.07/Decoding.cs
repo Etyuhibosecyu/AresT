@@ -41,24 +41,7 @@ public class Decoding : AresTLib005.Decoding
 			};
 		if (ProcessMethod(compressedFile) is byte[] bytes)
 			return bytes;
-		NList<byte> byteList;
-		if (misc == 2)
-		{
-			ProcessMisc(compressedFile, out _, out var nulls, out var list);
-			byteList = JoinWords(list, nulls);
-		}
-		else if (misc == 1)
-			byteList = new PPM(this, compressedFile[1..], ValuesInByte, ref repeatsCount).Decode().PNConvert(x => (byte)x[0].Lower);
-		else if (hf + lz + bwt != 0)
-		{
-			Current[0] = 0;
-			CurrentMaximum[0] = ProgressBarStep * (bwt != 0 ? (hfw ? 8 : 4) : (hfw ? 7 : 3));
-			ar = compressedFile[1..];
-			ListHashSet<int> nulls = new();
-			byteList = hfw ? JoinWords(RedStarLinq.Fill(3, i => new Decoding2(this, ar, nulls, hf, bwt, lz, n = i, hfw, ref repeatsCount).Decode()), nulls) : new Decoding2(this, ar, nulls, hf, bwt, lz, n = 0, hfw, ref repeatsCount).Decode().PNConvert(x => (byte)x[0].Lower);
-		}
-		else
-			byteList = compressedFile.GetSlice(1).ToNList();
+		var byteList = ProcessMisc(compressedFile);
 		Current[0] += ProgressBarStep;
 		if (rle == 14)
 			byteList = byteList.DecodeRLE3();
@@ -68,28 +51,20 @@ public class Decoding : AresTLib005.Decoding
 		return byteList.Repeat(repeatsCount).ToArray();
 	}
 
-	protected override void ProcessMisc(byte[] compressedFile, out uint encoding, out ListHashSet<int> nulls, out List<List<ShortIntervalList>> list)
+	protected override NList<byte> ProcessMisc1(byte[] compressedFile) => new PPM(this, ar = compressedFile[1..], ValuesInByte).Decode().PNConvert(x => (byte)x[0].Lower);
+
+	protected override NList<byte> ProcessNonMisc(byte[] compressedFile)
 	{
-		ar = compressedFile[1..];
-		var repeats = ar.ReadPart(new List<uint>(2, 224, 225));
-		repeatsCount = repeats == 0 ? 1 : (int)ar.ReadCount() + 2;
-		if (repeatsCount > GetFragmentLength() >> 1)
-			throw new DecoderFallbackException();
-		(encoding, var maxLength, var nullCount) = (ar.ReadEqual(3), ar.ReadCount(), ar.ReadCount((uint)BitsCount(GetFragmentLength())));
-		if (maxLength is < 2 || maxLength > GetFragmentLength() || nullCount > GetFragmentLength())
-			throw new DecoderFallbackException();
-		nulls = new();
-		for (var i = 0; i < nullCount; i++)
-			nulls.Add((int)ar.ReadCount((uint)BitsCount(GetFragmentLength())) + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
-		Current[0] = 0;
-		CurrentMaximum[0] = ProgressBarStep * 5;
-		list = new PPM(this, ar, maxLength, ref repeatsCount, 0).Decode();
-		list[0].Add(new() { new(encoding, 3) });
-		Current[0] += ProgressBarStep;
-		list.Add(new PPM(this, ar, ValuesInByte, ref repeatsCount, 1).Decode());
-		Current[0] += ProgressBarStep;
-		list.Add(new PPM(this, ar, (uint)list[0].Length - 1, ref repeatsCount, 2).Decode());
-		Current[0] += ProgressBarStep;
+		if (hf + lz + bwt != 0)
+		{
+			Current[0] = 0;
+			CurrentMaximum[0] = ProgressBarStep * (bwt != 0 ? (hfw ? 8 : 4) : (hfw ? 7 : 3));
+			ar = compressedFile[1..];
+			ListHashSet<int> nulls = new();
+			return hfw ? JoinWords(FillHFWTripleList(nulls), nulls) : CreateDecoding2(nulls, 0).Decode().PNConvert(x => (byte)x[0].Lower);
+		}
+		else
+			return compressedFile.GetSlice(1).ToNList();
 	}
 
 	public virtual void ProcessLZLength(LZData lzData, SumList lengthsSL, out int readIndex, out uint length)
@@ -127,6 +102,24 @@ public class Decoding : AresTLib005.Decoding
 		}
 		else
 			dist = (uint)readIndex;
+	}
+
+	protected override void PPMWGetEncodingAndNulls(out uint encoding, out uint maxLength, out ListHashSet<int> nulls)
+	{
+		GetRepeatsCount();
+		base.PPMWGetEncodingAndNulls(out encoding, out maxLength, out nulls);
+	}
+
+	protected override Decoding2 CreateDecoding2(ListHashSet<int> nulls, int i) => new(this, ar, nulls, hf, bwt, lz, n = i, hfw);
+
+	protected override PPM CreatePPM(uint @base, int n = -1) => new(this, ar, @base, n);
+
+	public virtual void GetRepeatsCount()
+	{
+		var repeats = ar.ReadPart(new List<uint>(2, 224, 225));
+		repeatsCount = repeats == 0 ? 1 : (int)ar.ReadCount() + 2;
+		if (repeatsCount > GetFragmentLength() >> 1)
+			throw new DecoderFallbackException();
 	}
 
 	public override List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, List<byte> skipped)

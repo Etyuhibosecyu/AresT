@@ -73,6 +73,8 @@ public static class Global
 
 public class Decoding : AresTLib007.Decoding
 {
+	protected bool shet;
+
 	public override byte[] Decode(byte[] compressedFile, byte encodingVersion)
 	{
 		if (compressedFile.Length <= 2)
@@ -88,25 +90,7 @@ public class Decoding : AresTLib007.Decoding
 			};
 		if (ProcessMethod(compressedFile) is byte[] bytes)
 			return bytes;
-		NList<byte> byteList;
-		if (misc is 2 or 3)
-		{
-			ProcessMisc(compressedFile, out var encoding, out var nulls, out var list);
-			ProcessUTF8(list, encoding == 2);
-			byteList = JoinWords(list, nulls, misc == 3);
-		}
-		else if (misc == 1)
-			byteList = new PPM(this, compressedFile[1..], ValuesInByte, ref repeatsCount).Decode().PNConvert(x => (byte)x[0].Lower);
-		else if (hf + lz + bwt != 0)
-		{
-			Current[0] = 0;
-			CurrentMaximum[0] = ProgressBarStep * (bwt != 0 ? (hfw ? 8 : 4) : (hfw ? 7 : 3));
-			ar = compressedFile[1..];
-			ListHashSet<int> nulls = new();
-			byteList = hfw ? JoinWords(ProcessUTF8(CreateVar(RedStarLinq.Fill(3, i => new Decoding2(this, ar, nulls, hf, bwt, lz, n = i, hfw, ref repeatsCount).Decode()), out var list), list[0][^1][0].Lower == 2), nulls, hf is 3 or 6) : new Decoding2(this, ar, nulls, hf, bwt, lz, n = 0, hfw, ref repeatsCount).Decode().PNConvert(x => (byte)x[0].Lower);
-		}
-		else
-			byteList = compressedFile.GetSlice(1).ToNList();
+		var byteList = ProcessMisc(compressedFile);
 		Current[0] += ProgressBarStep;
 		if (rle == 14)
 			byteList = byteList.DecodeRLE3();
@@ -114,6 +98,12 @@ public class Decoding : AresTLib007.Decoding
 		if (rle == 7)
 			byteList = byteList.DecodeRLE();
 		return byteList.Repeat(repeatsCount).ToArray();
+	}
+
+	protected override void SplitMethod(int method)
+	{
+		base.SplitMethod(method);
+		shet = misc == 3 || hf is 3 or 6;
 	}
 
 	protected virtual List<List<ShortIntervalList>> ProcessUTF8(List<List<ShortIntervalList>> list, bool utf8)
@@ -127,7 +117,7 @@ public class Decoding : AresTLib007.Decoding
 		return list;
 	}
 
-	protected virtual NList<byte> JoinWords(List<List<ShortIntervalList>> input, ListHashSet<int> nulls, bool shet = false) => input.Wrap(tl =>
+	protected override NList<byte> JoinWords(List<List<ShortIntervalList>> input, ListHashSet<int> nulls) => input.Wrap(tl =>
 	{
 		var encoding = tl[0][^1][0].Lower;
 		var encoding2 = (encoding == 1) ? Encoding.Unicode : (encoding == 2) ? Encoding.UTF8 : Encoding.GetEncoding(1251);
@@ -177,6 +167,41 @@ public class Decoding : AresTLib007.Decoding
 		}
 		return result;
 	}
+
+	public override void ProcessLZDist(LZData lzData, SumList distsSL, int fullLength, out int readIndex, out uint dist, uint length, out uint maxDist)
+	{
+		maxDist = Min(lzData.Dist.Max, (uint)(fullLength - length - 2));
+		readIndex = ar.ReadPart(distsSL);
+		distsSL.Increase(readIndex);
+		if (lzData.Dist.R == 0 || maxDist < lzData.Dist.Threshold)
+			dist = (uint)readIndex;
+		else if (lzData.Dist.R == 1)
+		{
+			dist = (uint)readIndex;
+			if (dist == lzData.Dist.Threshold + 1)
+				dist += ar.ReadEqual(maxDist - lzData.Dist.Threshold + lzData.UseSpiralLengths);
+		}
+		else
+		{
+			dist = (uint)readIndex + lzData.Dist.Threshold;
+			if (dist != maxDist + 1)
+				return;
+			dist = ar.ReadEqual(lzData.Dist.Threshold + lzData.UseSpiralLengths);
+			if (dist == lzData.Dist.Threshold)
+				dist = lzData.Dist.Max + 1;
+		}
+	}
+
+	protected override List<List<ShortIntervalList>> FillHFWTripleList(ListHashSet<int> nulls) => ProcessUTF8(CreateVar(base.FillHFWTripleList(nulls), out var list), list[0][^1][0].Lower == 2);
+
+	protected override List<List<ShortIntervalList>> PPMWFillTripleList(uint encoding, uint maxLength)
+	{
+		var list = base.PPMWFillTripleList(encoding, maxLength);
+		ProcessUTF8(list, encoding == 2);
+		return list;
+	}
+
+	protected override Decoding2 CreateDecoding2(ListHashSet<int> nulls, int i) => new(this, ar, nulls, hf, bwt, lz, n = i, hfw);
 
 	public override List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, List<byte> skipped)
 	{

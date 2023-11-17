@@ -2,15 +2,10 @@
 namespace AresTLib007;
 public class Decoding2 : AresTLib005.Decoding2
 {
-	public Decoding2(AresTLib005.Decoding decoding, ArithmeticDecoder ar, ListHashSet<int> nulls, int hf, int bwt, int lz, int n, bool hfw, ref int repeatsCount) : base(decoding, ar, nulls, hf, bwt, lz, n, hfw)
+	public Decoding2(AresTLib005.Decoding decoding, ArithmeticDecoder ar, ListHashSet<int> nulls, int hf, int bwt, int lz, int n, bool hfw) : base(decoding, ar, nulls, hf, bwt, lz, n, hfw)
 	{
 		if (n == 0)
-		{
-			var repeats = ar.ReadPart(new List<uint>(2, 224, 225));
-			repeatsCount = repeats == 0 ? 1 : (int)ar.ReadCount() + 2;
-			if (repeatsCount > decoding.GetFragmentLength() >> 1)
-				throw new DecoderFallbackException();
-		}
+			(decoding as Decoding ?? throw new InvalidOperationException()).GetRepeatsCount();
 	}
 
 	public override List<ShortIntervalList> Decode()

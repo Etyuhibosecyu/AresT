@@ -5,19 +5,14 @@ public class PPM : AresTLib005.PPM
 {
 	protected SumList lzLengthsSL;
 
-	public PPM(AresTLib005.Decoding decoding, ArithmeticDecoder ar, uint inputBase, ref int repeatsCount, int n = -1)
+	public PPM(AresTLib005.Decoding decoding, ArithmeticDecoder ar, uint inputBase, int n = -1)
 	{
 		this.decoding = decoding;
 		this.ar = ar;
 		this.inputBase = inputBase;
 		this.n = n;
 		if (n == -1)
-		{
-			var repeats = ar.ReadPart(new List<uint>(2, 224, 225));
-			repeatsCount = repeats == 0 ? 1 : (int)ar.ReadCount() + 2;
-			if (repeatsCount > decoding.GetFragmentLength() >> 1)
-				throw new DecoderFallbackException();
-		}
+			(decoding as Decoding ?? throw new InvalidOperationException()).GetRepeatsCount();
 		counter = ar.ReadCount();
 		dicsize = ar.ReadCount();
 		if (counter > decoding.GetFragmentLength() || dicsize > decoding.GetFragmentLength())

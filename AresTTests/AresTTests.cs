@@ -18,7 +18,8 @@ namespace AresTTests;
 public class DecompressionTests
 {
 	private readonly string[] files = Directory.GetFiles(Regex.Replace(AppDomain.CurrentDomain.BaseDirectory, @"(?<=\\)bin\\.*", ""), "*.txt", SearchOption.TopDirectoryOnly);
-	private readonly string[] unpackingFiles = Directory.GetFiles(Regex.Replace(AppDomain.CurrentDomain.BaseDirectory, @"(?<=\\)bin\\.*", ""), "*.ares-t", SearchOption.TopDirectoryOnly);
+	private readonly string[] programLogFiles = Directory.GetFiles(Regex.Replace(AppDomain.CurrentDomain.BaseDirectory, @"(?<=\\)bin\\.*", ""), "Program log*.ares-t", SearchOption.TopDirectoryOnly);
+	private readonly string[] wapFiles = Directory.GetFiles(Regex.Replace(AppDomain.CurrentDomain.BaseDirectory, @"(?<=\\)bin\\.*", ""), "Война и мир*.ares-t", SearchOption.TopDirectoryOnly);
 
 	[TestMethod]
 	public void TestHF()
@@ -120,14 +121,27 @@ public class DecompressionTests
 	}
 
 	[TestMethod]
-	public void TestDecompression()
+	public void TestProgramLogDecompression()
 	{
 		Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 		PresentMethods = UsedMethods.CS4 | UsedMethods.SHET4;
-		foreach (var file in unpackingFiles)
+		foreach (var file in programLogFiles)
 		{
 			MainClass.MainThread(file, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp", MainClass.Decompress, false);
 			Assert.IsTrue(RedStarLinq.Equals(File.ReadAllBytes((Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp"), File.ReadAllBytes(Regex.Replace(AppDomain.CurrentDomain.BaseDirectory, @"(?<=\\)bin\\.*", "") + @"Program log.txt")));
+		}
+		File.Delete((Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp");
+	}
+
+	[TestMethod]
+	public void TestWAPDecompression()
+	{
+		Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+		PresentMethods = UsedMethods.CS4 | UsedMethods.SHET4;
+		foreach (var file in wapFiles)
+		{
+			MainClass.MainThread(file, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp", MainClass.Decompress, false);
+			Assert.IsTrue(RedStarLinq.Equals(File.ReadAllBytes((Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp"), File.ReadAllBytes(Regex.Replace(AppDomain.CurrentDomain.BaseDirectory, @"(?<=\\)bin\\.*", "") + @"Война и мир.txt")));
 		}
 		File.Delete((Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp");
 	}

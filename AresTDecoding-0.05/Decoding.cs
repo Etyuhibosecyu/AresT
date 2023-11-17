@@ -39,22 +39,7 @@ public class Decoding
 		}
 		if (ProcessMethod(compressedFile) is byte[] bytes)
 			return bytes;
-		NList<byte> byteList;
-		if (misc == 2)
-		{
-			ProcessMisc(compressedFile, out _, out var nulls, out var list);
-			byteList = JoinWords(list, nulls);
-		}
-		else if (misc == 1)
-			byteList = new PPM(this, compressedFile[1..], ValuesInByte).Decode().PNConvert(x => (byte)x[0].Lower);
-		else
-		{
-			Current[0] = 0;
-			CurrentMaximum[0] = ProgressBarStep * (bwt != 0 ? (hfw ? 8 : 4) : (hfw ? 7 : 3));
-			ar = compressedFile[1..];
-			ListHashSet<int> nulls = new();
-			byteList = hfw ? JoinWords(RedStarLinq.Fill(3, i => new Decoding2(this, ar, nulls, hf, bwt, lz, n = i, hfw).Decode()), nulls) : new Decoding2(this, ar, nulls, hf, bwt, lz, n = 0, hfw).Decode().PNConvert(x => (byte)x[0].Lower);
-		}
+		var byteList = ProcessMisc(compressedFile);
 		Current[0] += ProgressBarStep;
 		if (rle == 14)
 			byteList = DecodeRLE3(byteList);
@@ -71,35 +56,50 @@ public class Decoding
 			return compressedFile[1..];
 		else if (compressedFile.Length <= 2)
 			throw new DecoderFallbackException();
+		SplitMethod(method);
+		if (method != 0 && compressedFile.Length <= 5)
+			throw new DecoderFallbackException();
+		return null;
+	}
+
+	protected virtual void SplitMethod(int method)
+	{
 		misc = method >= 64 ? method % 64 % 7 : -1;
 		hf = method % 64 % 7;
 		rle = method % 64 % 21 / 7 * 7;
 		lz = method % 64 % 42 / 21 * 21;
 		bwt = method % 64 / 42 * 42;
 		hfw = hf is 2 or 3 or 5 or 6;
-		if (method != 0 && compressedFile.Length <= 5)
-			throw new DecoderFallbackException();
-		return null;
 	}
 
-	protected virtual void ProcessMisc(byte[] compressedFile, out uint encoding, out ListHashSet<int> nulls, out List<List<ShortIntervalList>> list)
+	protected virtual NList<byte> ProcessMisc(byte[] compressedFile) => misc switch
+	{
+		2 => ProcessMisc2(compressedFile, out _),
+		1 => ProcessMisc1(compressedFile),
+		_ => ProcessNonMisc(compressedFile)
+	};
+
+	protected virtual NList<byte> ProcessMisc2(byte[] compressedFile, out uint encoding)
 	{
 		ar = compressedFile[1..];
-		(encoding, var maxLength, var nullCount) = (ar.ReadEqual(3), ar.ReadCount(), ar.ReadCount((uint)BitsCount(GetFragmentLength())));
-		if (maxLength < 2 || maxLength > GetFragmentLength() || nullCount > GetFragmentLength())
-			throw new DecoderFallbackException();
-		nulls = new();
-		for (var i = 0; i < nullCount; i++)
-			nulls.Add((int)ar.ReadCount((uint)BitsCount(GetFragmentLength())) + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
+		PPMWGetEncodingAndNulls(out encoding, out var maxLength, out var nulls);
+		var list = PPMWFillTripleList(encoding, maxLength);
+		return JoinWords(list, nulls);
+	}
+
+	protected virtual NList<byte> ProcessMisc1(byte[] compressedFile)
+	{
+		ar = compressedFile[1..];
+		return CreatePPM(ValuesInByte).Decode().PNConvert(x => (byte)x[0].Lower);
+	}
+
+	protected virtual NList<byte> ProcessNonMisc(byte[] compressedFile)
+	{
 		Current[0] = 0;
-		CurrentMaximum[0] = ProgressBarStep * 5;
-		list = new PPM(this, ar, maxLength, 0).Decode();
-		list[0].Add(new() { new(encoding, 3) });
-		Current[0] += ProgressBarStep;
-		list.Add(new PPM(this, ar, ValuesInByte, 1).Decode());
-		Current[0] += ProgressBarStep;
-		list.Add(new PPM(this, ar, (uint)list[0].Length - 1, 2).Decode());
-		Current[0] += ProgressBarStep;
+		CurrentMaximum[0] = ProgressBarStep * (bwt != 0 ? (hfw ? 8 : 4) : (hfw ? 7 : 3));
+		ar = compressedFile[1..];
+		ListHashSet<int> nulls = new();
+		return hfw ? JoinWords(FillHFWTripleList(nulls), nulls) : CreateDecoding2(nulls, 0).Decode().PNConvert(x => (byte)x[0].Lower);
 	}
 
 	protected virtual NList<byte> JoinWords(List<List<ShortIntervalList>> input, ListHashSet<int> nulls) => input.Wrap(tl =>
@@ -152,6 +152,8 @@ public class Decoding
 		}
 		return result;
 	}
+
+	protected virtual List<List<ShortIntervalList>> FillHFWTripleList(ListHashSet<int> nulls) => RedStarLinq.Fill(3, i => CreateDecoding2(nulls, i).Decode());
 
 	public virtual void ProcessLZLength(LZData lzData, out uint length)
 	{
@@ -217,6 +219,34 @@ public class Decoding
 		spiralLength = 0;
 		return false;
 	}
+
+	protected virtual void PPMWGetEncodingAndNulls(out uint encoding, out uint maxLength, out ListHashSet<int> nulls)
+	{
+		(encoding, maxLength, var nullCount) = (ar.ReadEqual(3), ar.ReadCount(), ar.ReadCount((uint)BitsCount(GetFragmentLength())));
+		if (maxLength < 2 || maxLength > GetFragmentLength() || nullCount > GetFragmentLength())
+			throw new DecoderFallbackException();
+		nulls = new();
+		for (var i = 0; i < nullCount; i++)
+			nulls.Add((int)ar.ReadCount((uint)BitsCount(GetFragmentLength())) + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
+	}
+
+	protected virtual List<List<ShortIntervalList>> PPMWFillTripleList(uint encoding, uint maxLength)
+	{
+		Current[0] = 0;
+		CurrentMaximum[0] = ProgressBarStep * 5;
+		List<List<ShortIntervalList>> list = CreatePPM(maxLength, 0).Decode();
+		list[0].Add(new() { new(encoding, 3) });
+		Current[0] += ProgressBarStep;
+		list.Add(CreatePPM(ValuesInByte, 1).Decode());
+		Current[0] += ProgressBarStep;
+		list.Add(CreatePPM((uint)list[0].Length - 1, 2).Decode());
+		Current[0] += ProgressBarStep;
+		return list;
+	}
+
+	protected virtual Decoding2 CreateDecoding2(ListHashSet<int> nulls, int i) => new(this, ar, nulls, hf, bwt, lz, n = i, hfw);
+
+	protected virtual PPM CreatePPM(uint @base, int n = -1) => new(this, ar, @base, n);
 
 	public virtual List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, List<byte> skipped)
 	{
