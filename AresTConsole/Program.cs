@@ -32,8 +32,8 @@ DateTime compressionStart = default;
 TcpListener tcpListener = default!; //монитор подключений TCP клиентов
 Thread listenThread = default!; //создание потока
 
-List<TcpClient> clients = new(); //список клиентских подключений
-List<NetworkStream> netStream = new(); //список потока данных
+List<TcpClient> clients = []; //список клиентских подключений
+List<NetworkStream> netStream = []; //список потока данных
 var port = 11000;
 Process executor = default!;
 #if RELEASE
@@ -215,7 +215,7 @@ void ThreadBool(bool startImmediate)
 		try
 		{
 			is_working = true;
-			SendMessageToClient(0, Encoding.UTF8.GetBytes(filename).Prepend((byte)1).ToArray());
+			SendMessageToClient(0, [.. Encoding.UTF8.GetBytes(filename).Prepend((byte)1)]);
 #if !DEBUG
 			compressionStart = DateTime.Now;
 #endif
@@ -235,7 +235,7 @@ void ThreadBool(bool startImmediate)
 		try
 		{
 			is_working = true;
-			SendMessageToClient(0, Encoding.UTF8.GetBytes(filename).Prepend((byte)2).ToArray());
+			SendMessageToClient(0, [.. Encoding.UTF8.GetBytes(filename).Prepend((byte)2)]);
 #if !DEBUG
 			compressionStart = DateTime.Now;
 #endif
@@ -255,7 +255,7 @@ void ThreadBool(bool startImmediate)
 		try
 		{
 			is_working = true;
-			SendMessageToClient(0, Encoding.UTF8.GetBytes(filename).Prepend((byte)3).ToArray());
+			SendMessageToClient(0, [.. Encoding.UTF8.GetBytes(filename).Prepend((byte)3)]);
 #if !DEBUG
 			compressionStart = DateTime.Now;
 #endif
@@ -320,7 +320,7 @@ void Stop(object? sender, ConsoleCancelEventArgs e)
 void SendUsedMethods()
 {
 	if (netStream.Length != 0)
-		SendMessageToClient(0, BitConverter.GetBytes((int)usedMethods).Prepend((byte)0).ToArray());
+		SendMessageToClient(0, [.. BitConverter.GetBytes((int)usedMethods).Prepend((byte)0)]);
 }
 
 if (ExecFunction.IsExecFunctionCommand(args))
@@ -333,24 +333,24 @@ filename = args.Length == 0 ? "" : args[0];
 	port = random.Next(1024, 65536);
 	StartExecutor();
 #endif
-	System.Threading.Thread.CurrentThread.Priority = ThreadPriority.Normal;
-	try
-	{
-		tcpListener = new (IPAddress.Loopback, port);
-		listenThread = new (new ThreadStart(ListenThread)) { Name = "Ожидание подключения клиентов" };
-listenThread.Start(); //старт потока
-listenThread.IsBackground = true;
-if ((args.Length == 0 ? "" : args[0]) != "")
+System.Threading.Thread.CurrentThread.Priority = ThreadPriority.Normal;
+try
 {
-	System.Threading.Thread.Sleep(MillisecondsPerSecond / 4);
-	operation_type = OperationType.Opening;
-	thread = new Thread(new ThreadStart(() => ThreadBool(true)));
-	thread.Start();
-	thread.IsBackground = true;
-}
-	}
-	catch
+	tcpListener = new(IPAddress.Loopback, port);
+	listenThread = new(new ThreadStart(ListenThread)) { Name = "Ожидание подключения клиентов" };
+	listenThread.Start(); //старт потока
+	listenThread.IsBackground = true;
+	if ((args.Length == 0 ? "" : args[0]) != "")
 	{
+		System.Threading.Thread.Sleep(MillisecondsPerSecond / 4);
+		operation_type = OperationType.Opening;
+		thread = new Thread(new ThreadStart(() => ThreadBool(true)));
+		thread.Start();
+		thread.IsBackground = true;
+	}
+}
+catch
+{
 	Disconnect();
 }
 CancelKeyPress += Stop;
@@ -372,7 +372,7 @@ Exit - выход";
 WriteLine(help);
 while (true)
 {
-	var s = (ReadLine()?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>()).AsSpan();
+	var s = (ReadLine()?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? []).AsSpan();
 	if (s.Length == 0)
 		continue;
 	if (is_working)
@@ -383,59 +383,59 @@ while (true)
 	switch (s[0])
 	{
 		case "Open":
-			if (s.Length > 1 && ((s[1] = string.Join(' ', s[1..].ToArray())).Length >= 2 && s[1][0] == '\"' && s[1][^1] == '\"' && (s[1] = s[1][1..^1]).Length > 0 || false) && Path.GetExtension(s[1]) == ".ares-t" && File.Exists(s[1]))
-			{
-				filename = s[1];
-				Open();
-			}
-			else
-			{
-				WriteLine("Некорректная команда! Введите Help, чтобы получить помощь.");
-			}
-			goto l1;
+		if (s.Length > 1 && ((s[1] = string.Join(' ', s[1..].ToArray())).Length >= 2 && s[1][0] == '\"' && s[1][^1] == '\"' && (s[1] = s[1][1..^1]).Length > 0 || false) && Path.GetExtension(s[1]) == ".ares-t" && File.Exists(s[1]))
+		{
+			filename = s[1];
+			Open();
+		}
+		else
+		{
+			WriteLine("Некорректная команда! Введите Help, чтобы получить помощь.");
+		}
+		goto l1;
 		case "Compress":
-			if (s.Length > 1 && ((s[1] = string.Join(' ', s[1..].ToArray())).Length >= 2 && s[1][0] == '\"' && s[1][^1] == '\"' && (s[1] = s[1][1..^1]).Length > 0 || false) && File.Exists(s[1]))
-			{
-				filename = s[1];
-				Compress();
-			}
-			else
-			{
-				WriteLine("Некорректная команда! Введите Help, чтобы получить помощь.");
-			}
-			goto l1;
+		if (s.Length > 1 && ((s[1] = string.Join(' ', s[1..].ToArray())).Length >= 2 && s[1][0] == '\"' && s[1][^1] == '\"' && (s[1] = s[1][1..^1]).Length > 0 || false) && File.Exists(s[1]))
+		{
+			filename = s[1];
+			Compress();
+		}
+		else
+		{
+			WriteLine("Некорректная команда! Введите Help, чтобы получить помощь.");
+		}
+		goto l1;
 		case "Unpack":
-			if (s.Length > 1 && ((s[1] = string.Join(' ', s[1..].ToArray())).Length >= 2 && s[1][0] == '\"' && s[1][^1] == '\"' && (s[1] = s[1][1..^1]).Length > 0 || false) && Path.GetExtension(s[1]) == ".ares-t" && File.Exists(s[1]))
-			{
-				filename = s[1];
-				Unpack();
-			}
-			else
-			{
-				WriteLine("Некорректная команда! Введите Help, чтобы получить помощь.");
-			}
-			goto l1;
+		if (s.Length > 1 && ((s[1] = string.Join(' ', s[1..].ToArray())).Length >= 2 && s[1][0] == '\"' && s[1][^1] == '\"' && (s[1] = s[1][1..^1]).Length > 0 || false) && Path.GetExtension(s[1]) == ".ares-t" && File.Exists(s[1]))
+		{
+			filename = s[1];
+			Unpack();
+		}
+		else
+		{
+			WriteLine("Некорректная команда! Введите Help, чтобы получить помощь.");
+		}
+		goto l1;
 		case "Start":
-			usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1;
-			goto l0;
+		usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1;
+		goto l0;
 		case "Optimus":
-			usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1 | UsedMethods.CS2 | UsedMethods.LZ2;
-			goto l0;
+		usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1 | UsedMethods.CS2 | UsedMethods.LZ2;
+		goto l0;
 		case "Pro":
-			usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1 | UsedMethods.CS2 | UsedMethods.LZ2 | UsedMethods.CS3 | UsedMethods.CS4;
-			goto l0;
+		usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1 | UsedMethods.CS2 | UsedMethods.LZ2 | UsedMethods.CS3 | UsedMethods.CS4;
+		goto l0;
 		case "Pro+":
-			usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1 | UsedMethods.CS2 | UsedMethods.LZ2 | UsedMethods.CS3 | UsedMethods.CS4 | UsedMethods.CS6;
-			goto l0;
+		usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1 | UsedMethods.CS2 | UsedMethods.LZ2 | UsedMethods.CS3 | UsedMethods.CS4 | UsedMethods.CS6;
+		goto l0;
 		case "Unlim":
-			usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1 | UsedMethods.CS2 | UsedMethods.LZ2 | UsedMethods.CS3 | UsedMethods.CS4 | UsedMethods.CS6 | UsedMethods.CS7;
-			goto l0;
+		usedMethods = UsedMethods.CS1 | UsedMethods.LZ1 | UsedMethods.HF1 | UsedMethods.CS2 | UsedMethods.LZ2 | UsedMethods.CS3 | UsedMethods.CS4 | UsedMethods.CS6 | UsedMethods.CS7;
+		goto l0;
 		case "Help":
-			WriteLine(help);
-			goto l1;
+		WriteLine(help);
+		goto l1;
 		case "Exit":
-			Environment.Exit(0);
-			goto l1;
+		Environment.Exit(0);
+		goto l1;
 	}
 	for (var i = 0; i < s.Length; i++)
 	{

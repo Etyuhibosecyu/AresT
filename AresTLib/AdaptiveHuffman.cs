@@ -6,8 +6,8 @@ internal record class AdaptiveHuffman(int TN)
 	private bool lz;
 	private int bwtLength, startPos;
 	private uint firstIntervalDist;
-	private readonly SumSet<uint> set = new();
-	private readonly SumList lengthsSL = new(), distsSL = new();
+	private readonly SumSet<uint> set = [];
+	private readonly SumList lengthsSL = [], distsSL = [];
 
 	public byte[] Encode(List<ShortIntervalList> input, LZData lzData)
 	{
@@ -52,8 +52,8 @@ internal record class AdaptiveHuffman(int TN)
 		StatusMaximum[TN] = input.Length - startPos;
 		Current[TN] += ProgressBarStep;
 		set.Clear();
-		lengthsSL.Replace(lz ? RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2)) : new());
-		distsSL.Replace(lz ? RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1) : new());
+		lengthsSL.Replace(lz ? RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2)) : []);
+		distsSL.Replace(lz ? RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1) : []);
 		firstIntervalDist = lz ? lzData.Dist.R == 2 ? lzData.Dist.Max - lzData.Dist.Threshold + 2 : (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
 		if (lz)
 			set.Add((newBase - 1, 1));

@@ -15,11 +15,11 @@ using System.Text.RegularExpressions;
 namespace AresTTests;
 
 [TestClass]
-public class DecompressionTests
+public partial class DecompressionTests
 {
-	private readonly string[] files = Directory.GetFiles(Regex.Replace(AppDomain.CurrentDomain.BaseDirectory, @"(?<=\\)bin\\.*", ""), "*.txt", SearchOption.TopDirectoryOnly);
-	private readonly string[] programLogFiles = Directory.GetFiles(Regex.Replace(AppDomain.CurrentDomain.BaseDirectory, @"(?<=\\)bin\\.*", ""), "Program log*.ares-t", SearchOption.TopDirectoryOnly);
-	private readonly string[] wapFiles = Directory.GetFiles(Regex.Replace(AppDomain.CurrentDomain.BaseDirectory, @"(?<=\\)bin\\.*", ""), "Война и мир*.ares-t", SearchOption.TopDirectoryOnly);
+	private readonly string[] files = Directory.GetFiles(ExcludeBinRegex().Replace(AppDomain.CurrentDomain.BaseDirectory, ""), "*.txt", SearchOption.TopDirectoryOnly);
+	private readonly string[] programLogFiles = Directory.GetFiles(ExcludeBinRegex().Replace(AppDomain.CurrentDomain.BaseDirectory, ""), "Program log*.ares-t", SearchOption.TopDirectoryOnly);
+	private readonly string[] wapFiles = Directory.GetFiles(ExcludeBinRegex().Replace(AppDomain.CurrentDomain.BaseDirectory, ""), "Война и мир*.ares-t", SearchOption.TopDirectoryOnly);
 
 	[TestMethod]
 	public void TestHF()
@@ -128,7 +128,7 @@ public class DecompressionTests
 		foreach (var file in programLogFiles)
 		{
 			MainClass.MainThread(file, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp", MainClass.Decompress, false);
-			Assert.IsTrue(RedStarLinq.Equals(File.ReadAllBytes((Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp"), File.ReadAllBytes(Regex.Replace(AppDomain.CurrentDomain.BaseDirectory, @"(?<=\\)bin\\.*", "") + @"Program log.txt")));
+			Assert.IsTrue(RedStarLinq.Equals(File.ReadAllBytes((Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp"), File.ReadAllBytes(ExcludeBinRegex().Replace(AppDomain.CurrentDomain.BaseDirectory, "") + @"Program log.txt")));
 		}
 		File.Delete((Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp");
 	}
@@ -141,8 +141,11 @@ public class DecompressionTests
 		foreach (var file in wapFiles)
 		{
 			MainClass.MainThread(file, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp", MainClass.Decompress, false);
-			Assert.IsTrue(RedStarLinq.Equals(File.ReadAllBytes((Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp"), File.ReadAllBytes(Regex.Replace(AppDomain.CurrentDomain.BaseDirectory, @"(?<=\\)bin\\.*", "") + @"Война и мир.txt")));
+			Assert.IsTrue(RedStarLinq.Equals(File.ReadAllBytes((Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp"), File.ReadAllBytes(ExcludeBinRegex().Replace(AppDomain.CurrentDomain.BaseDirectory, "") + @"Война и мир.txt")));
 		}
 		File.Delete((Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp");
 	}
+
+	[GeneratedRegex(@"(?<=\\)bin\\.*")]
+	private static partial Regex ExcludeBinRegex();
 }

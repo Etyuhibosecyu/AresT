@@ -27,7 +27,7 @@ public class Decoding
 	public virtual byte[] Decode(byte[] compressedFile, byte encodingVersion)
 	{
 		if (compressedFile.Length <= 2)
-			return Array.Empty<byte>();
+			return [];
 		if (encodingVersion == 0)
 			return compressedFile;
 		else if (encodingVersion < ProgramVersion)
@@ -46,7 +46,7 @@ public class Decoding
 		Current[0] += ProgressBarStep;
 		if (rle == 7)
 			byteList = DecodeRLE(byteList);
-		return byteList.ToArray();
+		return [.. byteList];
 	}
 
 	protected virtual byte[]? ProcessMethod(byte[] compressedFile)
@@ -98,7 +98,7 @@ public class Decoding
 		Current[0] = 0;
 		CurrentMaximum[0] = ProgressBarStep * (bwt != 0 ? (hfw ? 8 : 4) : (hfw ? 7 : 3));
 		ar = compressedFile[1..];
-		ListHashSet<int> nulls = new();
+		ListHashSet<int> nulls = [];
 		return hfw ? JoinWords(FillHFWTripleList(nulls), nulls) : CreateDecoding2(nulls, 0).Decode().PNConvert(x => (byte)x[0].Lower);
 	}
 
@@ -123,7 +123,7 @@ public class Decoding
 	{
 		Status[0] = 0;
 		StatusMaximum[0] = counter;
-		List<ShortIntervalList> result = new();
+		List<ShortIntervalList> result = [];
 		var startingArithmeticMap = lz == 0 ? huffmanData.ArithmeticMap : huffmanData.ArithmeticMap[..^1];
 		var uniqueLists = spaceCodes ? RedStarLinq.Fill(2, i => huffmanData.UniqueList.PConvert(x => new ShortIntervalList { x, new((uint)i, 2) })) : huffmanData.UniqueList.Convert(x => new ShortIntervalList() { x });
 		for (; counter > 0; counter--, Status[0]++)
@@ -225,7 +225,7 @@ public class Decoding
 		(encoding, maxLength, var nullCount) = (ar.ReadEqual(3), ar.ReadCount(), ar.ReadCount((uint)BitsCount(GetFragmentLength())));
 		if (maxLength < 2 || maxLength > GetFragmentLength() || nullCount > GetFragmentLength())
 			throw new DecoderFallbackException();
-		nulls = new();
+		nulls = [];
 		for (var i = 0; i < nullCount; i++)
 			nulls.Add((int)ar.ReadCount((uint)BitsCount(GetFragmentLength())) + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
 	}
@@ -235,7 +235,7 @@ public class Decoding
 		Current[0] = 0;
 		CurrentMaximum[0] = ProgressBarStep * 5;
 		List<List<ShortIntervalList>> list = CreatePPM(maxLength, 0).Decode();
-		list[0].Add(new() { new(encoding, 3) });
+		list[0].Add([new(encoding, 3)]);
 		Current[0] += ProgressBarStep;
 		list.Add(CreatePPM(ValuesInByte, 1).Decode());
 		Current[0] += ProgressBarStep;
@@ -283,7 +283,7 @@ public class Decoding
 		for (var i = 0; i < indexCodes.Length; i++)
 		{
 			it = convert[it];
-			result[i] = new() { new((uint)indexCodes[it], input[i][0].Base) };
+			result[i] = [new(indexCodes[it], input[i][0].Base)];
 			input[i].GetSlice(1).ForEach(x => result[i].Add(x));
 		}
 		return result;

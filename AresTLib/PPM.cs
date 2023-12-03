@@ -1,12 +1,18 @@
 ﻿
 namespace AresTLib;
 
-internal record class PPM(int TN)
+internal record class PPM(int TN) : IDisposable
 {
 	private ArithmeticEncoder ar = default!;
-	private readonly List<List<Interval>> result = new();
+	private readonly List<List<Interval>> result = [];
 	private int doubleListsCompleted = 0;
 	private readonly object lockObj = new();
+
+	public void Dispose()
+	{
+		ar.Dispose();
+		GC.SuppressFinalize(this);
+	}
 
 	public byte[] Encode(List<ShortIntervalList> input)
 	{
@@ -51,21 +57,21 @@ file record class PPMInternal(List<ShortIntervalList> Input, List<Interval> Resu
 {
 	private const int LZDictionarySize = 8388607;
 	private int startPos = 1;
-	private readonly SumSet<uint> globalSet = new(), newItemsSet = new();
+	private readonly SumSet<uint> globalSet = [], newItemsSet = [];
 	private const int maxDepth = 12;
 	private readonly LimitedQueue<List<Interval>> buffer = new(maxDepth);
 	private G.IEqualityComparer<NList<uint>> comparer = default!;
 	private FastDelHashSet<NList<uint>> contextHS = default!;
 	private HashList<int> lzhl = default!;
-	private readonly List<SumSet<uint>> sumSets = new();
-	private readonly SumList lzLengthsSL = new();
+	private readonly List<SumSet<uint>> sumSets = [];
+	private readonly SumList lzLengthsSL = [];
 	private uint lzCount, notLZCount, spaceCount, notSpaceCount;
 	private readonly LimitedQueue<bool> spaceBuffer = new(maxDepth);
 	private readonly LimitedQueue<uint> newItemsBuffer = new(maxDepth);
 	private readonly NList<uint> context = new(maxDepth), context2 = new(maxDepth);
-	private readonly SumSet<uint> set = new(), excludingSet = new();
-	private SumSet<uint> set2 = new();
-	private readonly List<Interval> intervalsForBuffer = new();
+	private readonly SumSet<uint> set = [], excludingSet = [];
+	private SumSet<uint> set2 = [];
+	private readonly List<Interval> intervalsForBuffer = [];
 	private int nextTarget = 0;
 
 	public bool Encode()
@@ -127,9 +133,9 @@ file record class PPMInternal(List<ShortIntervalList> Input, List<Interval> Resu
 		buffer.Clear();
 		comparer = N == 2 ? new NListEComparer<uint>() : new EComparer<NList<uint>>((x, y) => x.Equals(y), x => (int)x.Progression((uint)x.Length, (x, y) => (x << 7 | x >> BitsPerInt - 7) ^ (uint)y.GetHashCode()));
 		contextHS = new(comparer);
-		lzhl = new();
+		lzhl = [];
 		sumSets.Clear();
-		lzLengthsSL.Replace(new[] { 1 });
+		lzLengthsSL.Replace([1]);
 		lzCount = notLZCount = spaceCount = notSpaceCount = 1;
 		spaceBuffer.Clear();
 		newItemsBuffer.Clear();
@@ -268,7 +274,7 @@ file record class PPMInternal(List<ShortIntervalList> Input, List<Interval> Resu
 		{
 			if (outIndex == -1)
 				outIndex = index;
-			sumSets.SetOrAdd(index, new() { (item, 100) });
+			sumSets.SetOrAdd(index, [(item, 100)]);
 		}
 		var successLength = context.Length;
 		_ = context.Length == 0 ? null : successContext.Replace(context).RemoveAt(^1);
@@ -307,7 +313,7 @@ internal record class PPMBits(int TN)
 	{
 		Status[TN] = 0;
 		StatusMaximum[TN] = input.Length;
-		ArithmeticEncoder ar = new();
+		using ArithmeticEncoder ar = new();
 		ar.WriteCount((uint)input.Length);
 		var dicsize = LZDictionarySize << 3;
 		ar.WriteCount((uint)dicsize);
@@ -317,7 +323,7 @@ internal record class PPMBits(int TN)
 		var comparer = new EComparer<BitList>((x, y) => x.Equals(y), x => x.Length == 0 ? 1234567890 : x.ToUIntList().Progression(0, (x, y) => x << 7 ^ (int)y));
 		FastDelHashSet<BitList> contextHS = new(comparer);
 		HashList<BitList> lzhl = new(comparer);
-		List<(uint Zeros, uint Units)> sumSets = new();
+		List<(uint Zeros, uint Units)> sumSets = [];
 		uint lzCount = 1, notLZCount = 1;
 		var nextTarget = 0;
 		for (var i = 0; i < input.Length; i++, Status[TN]++)
@@ -328,7 +334,7 @@ internal record class PPMBits(int TN)
 			if (i < nextTarget)
 				goto l1;
 			var index = -1;
-			List<Interval> intervals = new();
+			List<Interval> intervals = [];
 			if (context.Length == maxDepth && i >= maxDepth << 1 && ProcessLZ(context, item, i) && i < nextTarget)
 				goto l1;
 			for (; context.Length > 0 && !contextHS.TryGetIndexOf(context, out index); context.RemoveAt(^1)) ;

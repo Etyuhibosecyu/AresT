@@ -35,8 +35,8 @@ public partial class MainPage : ContentPage
 	private readonly TcpListener tcpListener; //монитор подключений TCP клиентов
 	private readonly Thread listenThread; //создание потока
 
-	private readonly List<TcpClient> clients = new(); //список клиентских подключений
-	private readonly List<NetworkStream> netStream = new(); //список потока данных
+	private readonly List<TcpClient> clients = []; //список клиентских подключений
+	private readonly List<NetworkStream> netStream = []; //список потока данных
 	private readonly int port = 11000;
 	private Process executor;
 	private int executorId;
@@ -70,10 +70,10 @@ public partial class MainPage : ContentPage
 		InitializeComponent();
 		for (var i = 0; i < ProgressBarGroups; i++)
 		{
-			ThreadsLayout[i] = new();
+			ThreadsLayout[i] = [];
 			GridThreadsProgressBars.Add(ThreadsLayout[i], i / ProgressBarVGroups, i % ProgressBarVGroups);
-			ThreadsLayout[i].ColumnDefinitions = new() { new(GridLength.Auto), new(GridLength.Auto) };
-			ThreadsLayout[i].RowDefinitions = new() { new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Auto) };
+			ThreadsLayout[i].ColumnDefinitions = [new(GridLength.Auto), new(GridLength.Auto)];
+			ThreadsLayout[i].RowDefinitions = [new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Auto)];
 			LabelSubtotal[i] = new();
 			ThreadsLayout[i].Add(LabelSubtotal[i], 0, 0);
 			LabelSubtotal[i].FontSize = 12;
@@ -388,7 +388,7 @@ public partial class MainPage : ContentPage
 
 	private async Task<int> SetOFDParsInternal(string Filter)
 	{
-		var fileResult = await MainThread.InvokeOnMainThreadAsync(async () => await FilePicker.Default.PickAsync(new() { PickerTitle = $"Select the *{Filter} file", FileTypes = new(new Dictionary<DevicePlatform, G.IEnumerable<string>>() { { DevicePlatform.Android, new[] { "multipart/mixed" } }, { DevicePlatform.MacCatalyst, new[] { "UTType.Item" } }, { DevicePlatform.WinUI, new[] { Filter } } }) }));
+		var fileResult = await MainThread.InvokeOnMainThreadAsync(async () => await FilePicker.Default.PickAsync(new() { PickerTitle = $"Select the *{Filter} file", FileTypes = new(new Dictionary<DevicePlatform, G.IEnumerable<string>>() { { DevicePlatform.Android, ["multipart/mixed"] }, { DevicePlatform.MacCatalyst, ["UTType.Item"] }, { DevicePlatform.WinUI, new[] { Filter } } }) }));
 		filename = fileResult?.FullPath ?? "";
 		if (filename == "" || !filename.EndsWith(Filter))
 			emptyFileName = true;
@@ -417,7 +417,7 @@ public partial class MainPage : ContentPage
 		try
 		{
 			is_working = true;
-			SendMessageToClient(0, Encoding.UTF8.GetBytes(filename).Prepend((byte)(operation_type + 1)).ToArray());
+			SendMessageToClient(0, [.. Encoding.UTF8.GetBytes(filename).Prepend((byte)(operation_type + 1))]);
 #if !DEBUG
 				compressionStart = DateTime.Now;
 #endif
@@ -628,7 +628,7 @@ public partial class MainPage : ContentPage
 	private void SendUsedMethods()
 	{
 		if (netStream.Length != 0)
-			SendMessageToClient(0, BitConverter.GetBytes((int)usedMethods).Prepend((byte)0).ToArray());
+			SendMessageToClient(0, [.. BitConverter.GetBytes((int)usedMethods).Prepend((byte)0)]);
 	}
 
 	private readonly Grid[] ThreadsLayout;
@@ -645,12 +645,12 @@ public partial class MainPage : ContentPage
 
 public class OpacityConverter : IValueConverter
 {
-	public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+	public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		if (value is not bool b)
 			b = false;
 		return b ? 1 : 0.5;
 	}
 
-	public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => new();
+	public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => new();
 }

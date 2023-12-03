@@ -30,7 +30,7 @@ public class Decoding : AresTLib005.Decoding
 	public override byte[] Decode(byte[] compressedFile, byte encodingVersion)
 	{
 		if (compressedFile.Length <= 2)
-			return Array.Empty<byte>();
+			return [];
 		if (encodingVersion == 0)
 			return compressedFile;
 		else if (encodingVersion < ProgramVersion)
@@ -48,7 +48,7 @@ public class Decoding : AresTLib005.Decoding
 		Current[0] += ProgressBarStep;
 		if (rle == 7)
 			byteList = byteList.DecodeRLE();
-		return byteList.Repeat(repeatsCount).ToArray();
+		return [.. byteList.Repeat(repeatsCount)];
 	}
 
 	protected override NList<byte> ProcessMisc1(byte[] compressedFile) => new PPM(this, ar = compressedFile[1..], ValuesInByte).Decode().PNConvert(x => (byte)x[0].Lower);
@@ -60,7 +60,7 @@ public class Decoding : AresTLib005.Decoding
 			Current[0] = 0;
 			CurrentMaximum[0] = ProgressBarStep * (bwt != 0 ? (hfw ? 8 : 4) : (hfw ? 7 : 3));
 			ar = compressedFile[1..];
-			ListHashSet<int> nulls = new();
+			ListHashSet<int> nulls = [];
 			return hfw ? JoinWords(FillHFWTripleList(nulls), nulls) : CreateDecoding2(nulls, 0).Decode().PNConvert(x => (byte)x[0].Lower);
 		}
 		else
@@ -127,7 +127,7 @@ public class Decoding : AresTLib005.Decoding
 		Status[0] = 0;
 		StatusMaximum[0] = GetArrayLength(input.Length, BWTBlockSize + BWTBlockExtraSize);
 		var bytes = input.NConvert(x => (byte)x[0].Lower);
-		NList<byte> bytes2 = new();
+		NList<byte> bytes2 = [];
 		for (var i = 0; i < bytes.Length;)
 		{
 			var rle = bytes[i] & ValuesInByte >> 1;
@@ -168,14 +168,14 @@ public class Decoding : AresTLib005.Decoding
 		for (var i = 0; i < input.Length; i++)
 		{
 			it = convert[it];
-			result[i] = new() { new(input[it], ValuesInByte) };
+			result[i] = [new(input[it], ValuesInByte)];
 		}
 		return result;
 	}
 
 	public virtual NList<byte> DecodeRLEAfterBWT(NList<byte> byteList, ref int i)
 	{
-		NList<byte> result = new();
+		NList<byte> result = [];
 		int length, serie, l;
 		byte temp;
 		for (; i < byteList.Length && result.Length < BWTBlockSize;)

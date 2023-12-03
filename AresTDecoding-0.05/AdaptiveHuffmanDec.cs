@@ -56,18 +56,18 @@ public class AdaptiveHuffmanDec
 			throw new DecoderFallbackException();
 		Status[0] = 0;
 		StatusMaximum[0] = counter;
-		set = new() { (uint.MaxValue, 1) };
+		set = [(uint.MaxValue, 1)];
 	}
 
 	protected virtual void Prerequisites2()
 	{
-		uniqueList = new();
+		uniqueList = [];
 		if (lz != 0)
 		{
 			set.Add((fileBase - 1, 1));
 			uniqueList.Add(new(fileBase - 1, fileBase));
 		}
-		result = new();
+		result = [];
 	}
 
 	protected virtual void DecodeIteration()
@@ -79,7 +79,7 @@ public class AdaptiveHuffmanDec
 			fullLength++;
 			return;
 		}
-		result.Add(new() { uniqueList[^1] });
+		result.Add([uniqueList[^1]]);
 		decoding.ProcessLZLength(lzData, out var length);
 		result[^1].Add(new(length, lzData.Length.Max + 1));
 		if (length > result.Length - 2)

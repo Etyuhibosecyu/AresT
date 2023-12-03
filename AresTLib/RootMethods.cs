@@ -1,18 +1,9 @@
 ﻿
 namespace AresTLib;
 
-internal partial class Compression
+internal partial class Compression(NList<byte> originalFile, List<ShortIntervalList> input, int tn)
 {
-	private readonly NList<byte> originalFile;
-	private readonly List<ShortIntervalList> input, result = new();
-	private readonly int tn;
-
-	public Compression(NList<byte> originalFile, List<ShortIntervalList> input, int tn)
-	{
-		this.originalFile = originalFile;
-		this.input = input;
-		this.tn = tn;
-	}
+	private readonly List<ShortIntervalList> result = [];
 
 	internal List<ShortIntervalList> PreEncode(ref int rle, out NList<byte> originalFile2)
 	{
@@ -40,7 +31,7 @@ internal partial class Compression
 		}
 		originalFile2 = cstring;
 		cdl = new ShortIntervalList[originalFile2.Length + 1];
-		cdl[0] = new() { RepeatsNotApplied };
+		cdl[0] = [RepeatsNotApplied];
 		var originalFile2_ = originalFile2;
 		Parallel.For(0, originalFile2.Length, i => cdl[i + 1] = ByteIntervals[originalFile2_[i]]);
 		Subtotal[tn] += ProgressBarStep;
@@ -85,7 +76,7 @@ internal partial class Compression
 	{
 		byte[] s, cs2 = cs;
 		List<List<ShortIntervalList>> tl1, ctl;
-		LZData[] lzData = { new(), new(), new() };
+		LZData[] lzData = [new(), new(), new()];
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 9;
 		ctl = MakeWordsSplit((PresentMethods & UsedMethods.SHET2) != 0);
@@ -197,7 +188,9 @@ internal partial class Compression
 		byte[] s;
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 2;
-		s = new PPM(tn).Encode(input);
+		var ppm = new PPM(tn);
+		s = ppm.Encode(input);
+		ppm.Dispose();
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < originalFile.Length && s.Length > 0)
 		{
@@ -215,7 +208,9 @@ internal partial class Compression
 		if (ctl.Length == 0)
 			throw new EncoderFallbackException();
 		Subtotal[tn] += ProgressBarStep;
-		s = new PPM(tn).Encode(ctl);
+		var ppm = new PPM(tn);
+		s = ppm.Encode(ctl);
+		ppm.Dispose();
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < originalFile.Length && s.Length > 0)
 		{
@@ -235,7 +230,7 @@ public record class Executions(byte[] OriginalFile)
 	{
 		Total = 0;
 		TotalMaximum = ProgressBarStep * 6;
-		var mainInput = new Compression(OriginalFile.ToNList(), new(), 0).PreEncode(ref rle, out var originalFile2);
+		var mainInput = new Compression(OriginalFile.ToNList(), [], 0).PreEncode(ref rle, out var originalFile2);
 		Total += ProgressBarStep;
 		InitThreads(mainInput, originalFile2);
 		ProcessThreads();
@@ -281,7 +276,7 @@ public record class Executions(byte[] OriginalFile)
 			cs = s[0];
 		}
 		else
-			return new byte[] { (byte)rle }.Concat(originalFile2).ToArray();
+			return [(byte)rle, .. originalFile2];
 		var compressedFile = new[] { (byte)(misc + lz + bwt + rle + hf) }.Concat(cs).ToArray();
 #if DEBUG
 		Validate(compressedFile);

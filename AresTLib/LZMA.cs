@@ -22,8 +22,8 @@ internal record class LZMA(int TN)
 		Status[TN] = 0;
 		StatusMaximum[TN] = indexCodes.Sum(x => x.Length);
 		Current[TN] += ProgressBarStep;
-		TreeSet<int> maxReached = new();
-		Dictionary<int, int> maxReachedLengths = new();
+		TreeSet<int> maxReached = [];
+		Dictionary<int, int> maxReachedLengths = [];
 		uint useSpiralLengths = 0;
 		var maxLevel = Max(BitsCount(LZDictionarySize * BitsPerByte) / 2 - 5, 0);
 		var lockObj = RedStarLinq.FillArray(threadsCount, _ => new object());
@@ -71,7 +71,7 @@ internal record class LZMA(int TN)
 		}
 		result.FilterInPlace((x, index) => index == 0 || !elementsReplaced[index]);
 		elementsReplaced.Dispose();
-		List<Interval> c = new() { new Interval((uint)rDist, 3) };
+		List<Interval> c = [new Interval((uint)rDist, 3)];
 		c.WriteCount(maxDist, 24);
 		if (rDist != 0)
 			c.Add(new(thresholdDist, maxDist + 1));
@@ -103,7 +103,7 @@ internal record class LZMA(int TN)
 			{
 				var nextCodes = ic.GetSlice(..Max(ic.FindLastIndex(x => x <= bitList.Length - level * BitsPerByte - startKGlobal), 0)).GroupIndexes(iIC => bitList.GetSmallRange((int)iIC + startKGlobal, BitsPerByte)).FilterInPlace(x => x.Length >= 2).Convert(x => x.ToArray(index => ic[index]).NSort());
 				var nextCodes2 = nextCodes.JoinIntoSingle().ToHashSet();
-				ic = ic.Filter(x => !nextCodes2.Contains(x)).ToArray();
+				ic = [.. ic.Filter(x => !nextCodes2.Contains(x))];
 				nextCodes.ForEach(x => FindMatchesRecursive(x, level + 1));
 			}
 			if (ic.Length > 1)
@@ -148,14 +148,14 @@ internal record class LZMA(int TN)
 
 	private static (uint Value, uint Escape, int bitsCount, List<int> ValueIndexes) LZMABlockStart(BitList bitList)
 	{
-		using NList<int> ranges = new();
+		using NList<int> ranges = [];
 		for (var i = 2; i <= BitsPerByte; i++)
 		{
 			ranges.Replace(RedStarLinq.PNFill(bitList.Length - (i - 1), index => (int)bitList.GetSmallRange(index, i)));
 			using var hs = new Chain(i).ToHashSet();
 			hs.ExceptWith(ranges);
 			if (hs.Length != 0)
-				return ((uint)hs[0], uint.MaxValue, i, new());
+				return ((uint)hs[0], uint.MaxValue, i, []);
 		}
 		using var groups = ranges.Group();
 		return ((uint)CreateVar(groups.FindMin(x => x.Length)!.Key, out var value), (uint)groups.FilterInPlace(x => x.Key != value).FindMin(x => x.Length)!.Key, BitsPerByte, ranges.IndexesOf(value));

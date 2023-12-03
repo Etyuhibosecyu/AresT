@@ -31,7 +31,7 @@ internal partial class Compression
 		var uniqueWords2 = uniqueWords.PConvert(x => encoding2.GetBytes(x.String));
 		Status[tn]++;
 		var uniqueIntervals = RedStarLinq.Fill(uniqueWords.Length, index => new Interval((uint)index, (uint)uniqueWords.Length));
-		var uniqueLists = uniqueIntervals.ToArray(x => new[] { new ShortIntervalList { x, new Interval(0, 2) }, new ShortIntervalList { x, new(1, 2) } });
+		var uniqueLists = uniqueIntervals.ToArray(x => new ShortIntervalList[] { [x, new Interval(0, 2)], [x, new(1, 2)] });
 		var byteLists = RedStarLinq.Fill(ValuesInByte, index => new ShortIntervalList { new((uint)index, ValuesInByte) });
 		Status[tn]++;
 		var lengths = uniqueWords2.PNConvert(x => (uint)x.Length);
@@ -42,8 +42,8 @@ internal partial class Compression
 		Status[tn]++;
 		var indexCodes = wordsWithoutSpaces.RepresentIntoNumbers();
 		Status[tn]++;
-		List<List<ShortIntervalList>> result = new();
-		List<Interval> c = new() { new(encoding, 3) };
+		List<List<ShortIntervalList>> result = [];
+		List<Interval> c = [new(encoding, 3)];
 		c.WriteCount(maxLength);
 		result.Add(lengths.PConvert(x => new ShortIntervalList { new(x, maxLength + 1) }));
 		Status[tn]++;
@@ -54,14 +54,14 @@ internal partial class Compression
 		if (encoding == 2)
 		{
 			if (redundantByte == null)
-				result.Add(new() { new() { new(0, 2) } });
+				result.Add([[new(0, 2)]]);
 			else
 			{
-				result.Add(new() { new() { new(1, 2) } });
+				result.Add([[new(1, 2)]]);
 				result[^1][^1].Add(new(redundantByte.Value, ValuesInByte));
 			}
 		}
-		List<Interval> nullIntervals = new();
+		List<Interval> nullIntervals = [];
 		nullIntervals.WriteCount((uint)nulls.Length, (uint)BitsCount(FragmentLength));
 		for (var i = 0; i < nulls.Length; i++)
 			nullIntervals.WriteCount((uint)(nulls[i] - CreateVar(i == 0 ? 0 : nulls[i - 1] + 1, out var prev)), (uint)BitsCount(FragmentLength));
@@ -102,7 +102,7 @@ internal partial class Compression
 		if (originalFile.Length == 0)
 		{
 			encoding = 0;
-			nulls = new();
+			nulls = [];
 			return "";
 		}
 		Status[tn] = 0;
@@ -131,13 +131,13 @@ internal partial class Compression
 			Status[tn]++;
 		});
 		int ansiLettersSum = ansiLetters.Sum(), utf16LettersSum = utf16Letters.Sum(), utf8LettersSum = utf8Letters.Sum();
-		ListHashSet<int> singleNullsSum = singleNulls.ConvertAndJoin(x => x).ToHashSet(), doubleNullsSum = doubleNulls.ConvertAndJoin(x => x).ToHashSet();
+		ListHashSet<int> singleNullsSum = [.. singleNulls.ConvertAndJoin(x => x)], doubleNullsSum = [.. doubleNulls.ConvertAndJoin(x => x)];
 		var nullSequenceStart = -1;
 		doubleNullsSum.FilterInPlace((x, index) => (index == 0 || doubleNullsSum[index - 1] != x - 1 || (index - nullSequenceStart) % 2 == 0) && (nullSequenceStart = index) >= 0);
 		if (doubleNullsSum.Length * doubleNullsSum.Length * 400 >= originalFile.Length)
 		{
 			encoding = 0;
-			nulls = new();
+			nulls = [];
 			return "";
 		}
 		if ((utf16LettersSum >= (originalFile.Length + 9) / 10 || utf16LettersSum > ansiLettersSum) && utf16LettersSum > utf8LettersSum)
@@ -162,7 +162,7 @@ internal partial class Compression
 			encoding = 0;
 			if (singleNulls.Length * singleNulls.Length * 400 >= originalFile.Length)
 			{
-				nulls = new();
+				nulls = [];
 				return "";
 			}
 			else
@@ -176,7 +176,7 @@ internal partial class Compression
 	/// <summary>Разделяет текст на слова. Для этой цели можно было бы использовать регулярные выражения, но они потребляют слишком много ресурсов.</summary>
 	private List<Word> DivideIntoWords(string text)
 	{
-		List<Word> outputWords = new();
+		List<Word> outputWords = [];
 		var wordStart = 0;
 		var state = 0; //0 - начальное состояние, 1 - прописные буквы, 2 - строчные буквы, 3 - цифры, 4 - пробел, 5 - перевод строки #1, 6 - перевод строки #2, 7 - управляющий символ SHET, 8 - второй символ SHET, 9 - управляющий символ предлога SHET, 10 - второй символ предлога SHET, 11 - прочие символы.
 		var space = false;

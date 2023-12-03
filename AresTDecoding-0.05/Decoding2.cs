@@ -33,9 +33,9 @@ public class Decoding2
 		lzSpiralLength = new();
 		maxFrequency = 0;
 		frequencyCount = 0;
-		arithmeticMap = new();
-		uniqueList = new();
-		skipped = new();
+		arithmeticMap = [];
+		uniqueList = [];
+		skipped = [];
 	}
 
 	public virtual List<ShortIntervalList> Decode()
@@ -169,7 +169,7 @@ public class Decoding2
 		compressedList = decoding.ReadCompressedList(huffmanData, bwt, lzData, lz, counter, n == 2);
 	l1:
 		if (hfw && n == 0)
-			compressedList.Add(new() { new(encoding, 3) });
+			compressedList.Add([new(encoding, 3)]);
 		if (bwt != 0 && !(hfw && n != 1))
 		{
 			Current[0] += ProgressBarStep;

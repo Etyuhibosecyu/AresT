@@ -1,38 +1,19 @@
 ﻿
 namespace AresTLib007;
 
-public class PPM : AresTLib005.PPM
+public class PPM(AresTLib005.Decoding decoding, ArithmeticDecoder ar, uint inputBase, int n = -1) : AresTLib005.PPM(decoding, ar, inputBase, n)
 {
-	protected SumList lzLengthsSL;
+	protected SumList lzLengthsSL = default!;
 
-	public PPM(AresTLib005.Decoding decoding, ArithmeticDecoder ar, uint inputBase, int n = -1)
+	protected override void Initialize()
 	{
-		this.decoding = decoding;
-		this.ar = ar;
-		this.inputBase = inputBase;
-		this.n = n;
 		if (n == -1)
 			(decoding as Decoding ?? throw new InvalidOperationException()).GetRepeatsCount();
-		counter = ar.ReadCount();
-		dicsize = ar.ReadCount();
-		if (counter > decoding.GetFragmentLength() || dicsize > decoding.GetFragmentLength())
-			throw new DecoderFallbackException();
-		Status[0] = 0;
-		StatusMaximum[0] = (int)counter;
-		result = new();
-		globalSet = new();
-		newItemsSet = n == 2 ? new() : new(new Chain((int)inputBase).Convert(x => ((uint)x, 1)));
-		maxDepth = 12;
-		var comparer = n == 2 ? (G.IEqualityComparer<NList<uint>>)new NListEComparer<uint>() : new EComparer<NList<uint>>((x, y) => x.Equals(y), x => (int)x.Progression((uint)x.Length, (x, y) => (x << 7 | x >> BitsPerInt - 7) ^ (uint)y.GetHashCode()));
-		contextHS = new(comparer);
-		sumSets = new();
-		preLZMap = new(2, 1, 2);
-		spacesMap = new(2, 1, 2);
-		nextWordLink = 0;
-		lzLengthsSL = new() { 1 };
+		base.Initialize();
+		lzLengthsSL = [1];
 	}
 
-	protected override uint PPMLZProcessLength()
+	protected override uint ProcessLZLength()
 	{
 		var readIndex = ar.ReadPart(lzLengthsSL);
 		uint length;

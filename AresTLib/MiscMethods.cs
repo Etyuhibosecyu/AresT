@@ -1,6 +1,4 @@
-﻿using System;
-using System.Text;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 namespace AresTLib;
 
@@ -112,7 +110,7 @@ internal partial class Compression
 		uniqueElems.ExceptWith(uniqueElems2);
 #if DEBUG
 		var input2 = input.Skip(startPos);
-		var decoded = new Decoding().DecodeBWT(result.GetRange(startPos), uniqueElems.ToList());
+		var decoded = new Decoding().DecodeBWT(result.GetRange(startPos), [.. uniqueElems]);
 		for (var i = 0; i < input2.Length && i < decoded.Length; i++)
 			for (var j = 0; j < input2[i].Length && j < decoded[i].Length; j++)
 			{
@@ -144,7 +142,7 @@ internal partial class Compression
 			{
 				tasks[i % buffer.Length]?.Wait();
 				int i2 = i * BWTBlockSize, length = Min(BWTBlockSize, byteInput.Length - i2);
-				MTFMemory[i % buffer.Length] = uniqueElems2.ToArray();
+				MTFMemory[i % buffer.Length] = [.. uniqueElems2];
 				if (byteInput.Length - i2 < BWTBlockSize)
 				{
 					buffer[i % buffer.Length] = default!;
@@ -217,14 +215,14 @@ internal partial class Compression
 			while (i < input.Length && i - j < ValuesIn2Bytes && input[i] != 0)
 				i++;
 			if (i != j)
-				result.AddRange(i - j < ValuesInByte >> 1 ? new[] { (byte)(i - j - 1 + (ValuesInByte >> 1)) } : new[] { (byte)(ValuesInByte - 1), (byte)((i - j - (ValuesInByte >> 1)) >> BitsPerByte), (byte)(i - j - (ValuesInByte >> 1)) }).AddRange(input.GetSlice(j..i));
+				result.AddRange(i - j < ValuesInByte >> 1 ? [(byte)(i - j - 1 + (ValuesInByte >> 1))] : [(byte)(ValuesInByte - 1), (byte)((i - j - (ValuesInByte >> 1)) >> BitsPerByte), (byte)(i - j - (ValuesInByte >> 1))]).AddRange(input.GetSlice(j..i));
 			if (i - j >= ValuesIn2Bytes)
 				continue;
 			j = i;
 			while (i < input.Length && i - j < ValuesIn2Bytes && input[i] == 0)
 				i++;
 			if (i != j)
-				result.AddRange(i - j < ValuesInByte >> 1 ? new[] { (byte)(i - j - 1) } : new[] { (byte)((ValuesInByte >> 1) - 1), (byte)((i - j - (ValuesInByte >> 1)) >> BitsPerByte), (byte)(i - j - (ValuesInByte >> 1)) });
+				result.AddRange(i - j < ValuesInByte >> 1 ? [(byte)(i - j - 1)] : [(byte)((ValuesInByte >> 1) - 1), (byte)((i - j - (ValuesInByte >> 1)) >> BitsPerByte), (byte)(i - j - (ValuesInByte >> 1))]);
 		}
 #if DEBUG
 		var input2 = input;
@@ -267,5 +265,5 @@ internal partial class Compression
 		return s.Length < x.Length ? s : x.Value;
 	}
 
-	private static char ToSHETChar(int x) => Encoding1251.GetChars(new[] { (byte)(x + (x >= 31 ? 2 : 1)) })[0];
+	private static char ToSHETChar(int x) => Encoding1251.GetChars([(byte)(x + (x >= 31 ? 2 : 1))])[0];
 }

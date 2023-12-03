@@ -1,8 +1,5 @@
-﻿using System.Diagnostics;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
-using System.Text;
-using static UnsafeFunctions.Global;
 
 namespace AresTLib;
 
@@ -10,9 +7,9 @@ public static class MainClass
 {
 	private static TcpClient? client;
 	private static NetworkStream? netStream;
-	private static byte[] toSend = Array.Empty<byte>();
+	private static byte[] toSend = [];
 	private static Thread thread = new(() => { });
-	private static readonly int[] FibonacciSequence = new int[]{ 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181, 6765, 10946, 17711, 28657, 46368, 75025, 121393, 196418, 317811, 514229, 832040, 1346269, 2178309, 3524578, 5702887, 9227465, 14930352, 24157817, 39088169, 63245986, 102334155, 165580141, 267914296, 433494437, 701408733, 1134903170, 1836311903 };
+	private static readonly int[] FibonacciSequence = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181, 6765, 10946, 17711, 28657, 46368, 75025, 121393, 196418, 317811, 514229, 832040, 1346269, 2178309, 3524578, 5702887, 9227465, 14930352, 24157817, 39088169, 63245986, 102334155, 165580141, 267914296, 433494437, 701408733, 1134903170, 1836311903];
 	private static FileStream rfs = default!;
 	private static FileStream wfs = default!;
 	private static int fragmentCount;
@@ -23,7 +20,7 @@ public static class MainClass
 	public static void Main(string[] args)
 	{
 #if !RELEASE
-		args = new[] { "11000" };
+		args = ["11000"];
 		Thread.Sleep(MillisecondsPerSecond * 5);
 #endif
 		if (!(args.Length != 0 && int.TryParse(args[0], out var port) && port >= 1024 && port <= 65535))
@@ -70,7 +67,7 @@ public static class MainClass
 				netStream.Write(toSendLen, 0, toSendLen.Length);
 				netStream.Write(toSend, 0, toSend.Length);
 				netStream.Flush(); //удаление данных из потока
-				toSend = Array.Empty<byte>();
+				toSend = [];
 			}
 		}
 		catch
@@ -134,7 +131,7 @@ public static class MainClass
 			lock (lockObj)
 			{
 				isWorking = false;
-				toSend = new byte[] { 2 };
+				toSend = [2];
 				SendMessage();
 			}
 		}
@@ -159,7 +156,7 @@ public static class MainClass
 			lock (lockObj)
 			{
 				isWorking = false;
-				toSend = new byte[] { 1 };
+				toSend = [1];
 				if (send)
 					SendMessage();
 			}
@@ -169,7 +166,7 @@ public static class MainClass
 			lock (lockObj)
 			{
 				isWorking = false;
-				toSend = new byte[] { (byte)(action == Compress ? 3 : 2) };
+				toSend = [(byte)(action == Compress ? 3 : 2)];
 				if (send)
 					SendMessage();
 				else
@@ -181,7 +178,7 @@ public static class MainClass
 			lock (lockObj)
 			{
 				isWorking = false;
-				toSend = new byte[] { 2 };
+				toSend = [2];
 				if (send)
 					SendMessage();
 				else
@@ -204,11 +201,14 @@ public static class MainClass
 		Thread.Sleep(MillisecondsPerSecond);
 		while (isWorking)
 		{
-			List<byte> list = new() { 0 };
-			list.AddRange(BitConverter.GetBytes(Supertotal));
-			list.AddRange(BitConverter.GetBytes(SupertotalMaximum));
-			list.AddRange(BitConverter.GetBytes(Total));
-			list.AddRange(BitConverter.GetBytes(TotalMaximum));
+			List<byte> list =
+			[
+				0,
+				.. BitConverter.GetBytes(Supertotal),
+				.. BitConverter.GetBytes(SupertotalMaximum),
+				.. BitConverter.GetBytes(Total),
+				.. BitConverter.GetBytes(TotalMaximum),
+			];
 			for (var i = 0; i < ProgressBarGroups; i++)
 			{
 				list.AddRange(BitConverter.GetBytes(Subtotal[i]));
@@ -219,7 +219,7 @@ public static class MainClass
 				list.AddRange(BitConverter.GetBytes(StatusMaximum[i]));
 			}
 			lock (lockObj)
-				toSend = list.ToArray();
+				toSend = [.. list];
 			Thread.Sleep(MillisecondsPerSecond);
 		}
 	}
@@ -286,7 +286,7 @@ public static class MainClass
 			rfs.Read(bytes, 0, bytes.Length);
 			var s = new Executions(bytes).Encode();
 			if (fragmentCount != 1)
-				wfs.Write(new byte[]{ (byte)(s.Length >> (BitsPerByte << 1)), (byte)(s.Length >> BitsPerByte), (byte)s.Length }, 0, 3);
+				wfs.Write([(byte)(s.Length >> (BitsPerByte << 1)), (byte)(s.Length >> BitsPerByte), (byte)s.Length], 0, 3);
 			wfs.Write(s, 0, s.Length);
 			Supertotal += ProgressBarStep;
 			GC.Collect();
@@ -294,7 +294,7 @@ public static class MainClass
 		if (wfs.Position > rfs.Length + 2)
 		{
 			wfs.Seek(0, SeekOrigin.Begin);
-			wfs.Write(new byte[] { 0 }, 0, 1);
+			wfs.Write([0], 0, 1);
 			rfs.Seek(0, SeekOrigin.Begin);
 			var bytes2 = rfs.Length < FragmentLength ? default! : new byte[FragmentLength];
 			for (var i = 0; i < rfs.Length; i += FragmentLength)
@@ -400,7 +400,7 @@ public static class MainClass
 			}
 			var s = new Executions(new Decoding().Decode(bytes, encodingVersion)).Encode();
 			if (fragmentCount != 1)
-				wfs.Write(new byte[]{ (byte)(s.Length >> (BitsPerByte << 1)), (byte)(s.Length >> BitsPerByte), (byte)s.Length }, 0, 3);
+				wfs.Write([(byte)(s.Length >> (BitsPerByte << 1)), (byte)(s.Length >> BitsPerByte), (byte)s.Length], 0, 3);
 			wfs.Write(s, 0, s.Length);
 			Supertotal += ProgressBarStep;
 			GC.Collect();

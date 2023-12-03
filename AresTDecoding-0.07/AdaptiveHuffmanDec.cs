@@ -1,19 +1,10 @@
 ﻿
 namespace AresTLib007;
 
-public class AdaptiveHuffmanDec : AresTLib005.AdaptiveHuffmanDec
+public class AdaptiveHuffmanDec(Decoding decoding, ArithmeticDecoder ar, List<byte> skipped, LZData lzData, int lz, int bwt, int n, int counter, bool hfw) : AresTLib005.AdaptiveHuffmanDec(decoding, ar, skipped, lzData, lz, bwt, n, counter, hfw)
 {
-	private readonly Decoding decoding = default!;
-	protected SumList lengthsSL = default!, distsSL = default!;
-	protected uint firstIntervalDist;
-
-	public AdaptiveHuffmanDec(Decoding decoding, ArithmeticDecoder ar, List<byte> skipped, LZData lzData, int lz, int bwt, int n, int counter, bool hfw) : base(decoding, ar, skipped, lzData, lz, bwt, n, counter, hfw)
-	{
-		this.decoding = decoding;
-		lengthsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2))) : new();
-		distsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1)) : new();
-		firstIntervalDist = lz != 0 ? (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
-	}
+	protected SumList lengthsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2))) : new(), distsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1)) : new();
+	protected uint firstIntervalDist = lz != 0 ? (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
 
 	protected override void DecodeIteration()
 	{
@@ -26,7 +17,7 @@ public class AdaptiveHuffmanDec : AresTLib005.AdaptiveHuffmanDec
 				distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1);
 			return;
 		}
-		result.Add(new() { uniqueList[^1] });
+		result.Add([uniqueList[^1]]);
 		decoding.ProcessLZLength(lzData, lengthsSL, out readIndex, out var length);
 		result[^1].Add(new(length, lzData.Length.Max + 1));
 		decoding.ProcessLZDist(lzData, distsSL, fullLength, out readIndex, out var dist, length, out var maxDist);
