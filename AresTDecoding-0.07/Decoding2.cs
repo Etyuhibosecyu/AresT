@@ -1,5 +1,6 @@
 ﻿
 namespace AresTLib007;
+
 public class Decoding2 : AresTLib005.Decoding2
 {
 	public Decoding2(AresTLib005.Decoding decoding, ArithmeticDecoder ar, ListHashSet<int> nulls, int hf, int bwt, int lz, int n, bool hfw) : base(decoding, ar, nulls, hf, bwt, lz, n, hfw)
@@ -14,7 +15,7 @@ public class Decoding2 : AresTLib005.Decoding2
 		if (lz != 0)
 		{
 			var counter2 = 7;
-			lzRDist = ar.ReadEqual(3);
+			lzRDist = (int)ar.ReadEqual(3);
 			lzMaxDist = ar.ReadCount();
 			if (lzRDist != 0)
 			{
@@ -22,7 +23,7 @@ public class Decoding2 : AresTLib005.Decoding2
 				counter2++;
 			}
 			lzDist = new(lzRDist, lzMaxDist, lzThresholdDist);
-			lzRLength = ar.ReadEqual(3);
+			lzRLength = (int)ar.ReadEqual(3);
 			lzMaxLength = ar.ReadCount(16);
 			if (lzRLength != 0)
 			{
@@ -38,7 +39,7 @@ public class Decoding2 : AresTLib005.Decoding2
 			lzUseSpiralLengths = ar.ReadEqual(2);
 			if (lzUseSpiralLengths == 1)
 			{
-				lzRSpiralLength = ar.ReadEqual(3);
+				lzRSpiralLength = (int)ar.ReadEqual(3);
 				lzMaxSpiralLength = ar.ReadCount(16);
 				counter2 += 3;
 				if (lzRSpiralLength != 0)

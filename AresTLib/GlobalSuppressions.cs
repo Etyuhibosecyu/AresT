@@ -9,7 +9,6 @@ global using System.Threading;
 global using System.Threading.Tasks;
 global using UnsafeFunctions;
 global using G = System.Collections.Generic;
-global using static AresGlobalMethods.Decoding;
 global using static AresGlobalMethods.LempelZiv;
 global using static AresGlobalMethods.Global;
 global using static AresTLib.Global;

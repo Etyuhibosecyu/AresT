@@ -5,22 +5,16 @@ public class AdaptiveHuffmanDec : AresTLib007.AdaptiveHuffmanDec
 {
 	private readonly Decoding decoding = default!;
 	protected int lzLength;
-	private bool lessThanThreshold = true;
 
 	public AdaptiveHuffmanDec(Decoding decoding, ArithmeticDecoder ar, List<byte> skipped, LZData lzData, int lz, int bwt, int n, int counter, bool hfw) : base(decoding, ar, skipped, lzData, lz, bwt, n, counter, hfw)
 	{
 		this.decoding = decoding;
-		firstIntervalDist = lz != 0 ? lzData.Dist.R == 2 ? lzData.Dist.Max - lzData.Dist.Threshold + 2 : (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
+		firstIntervalDist = lz != 0 ? (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
 	}
 
 	protected override void DecodeIteration()
 	{
 		var readIndex = ReadFirst();
-		if (lzData.Dist.R == 2 && lessThanThreshold && distsSL.Length - lzData.UseSpiralLengths - 1 >= lzData.Dist.Threshold)
-		{
-			distsSL.Remove(0, (int)(lzData.Dist.Threshold + 1 - lzData.UseSpiralLengths));
-			lessThanThreshold = false;
-		}
 		if (!(lz != 0 && uniqueList[readIndex].Lower == fileBase - 1))
 		{
 			result.Add(n == 2 ? new() { uniqueList[readIndex], new(ar.ReadEqual(2), 2) } : new() { uniqueList[readIndex] });

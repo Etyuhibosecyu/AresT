@@ -3,7 +3,7 @@ namespace AresTLib;
 
 internal partial class Compression
 {
-	private List<List<ShortIntervalList>> MakeWordsSplit(bool shet)
+	private List<List<ShortIntervalList>> MakeWordsSplit(bool comb, bool fab)
 	{
 		Current[tn] = 0;
 		CurrentMaximum[tn] = ProgressBarStep * 3;
@@ -12,12 +12,25 @@ internal partial class Compression
 			throw new EncoderFallbackException();
 		var encoding2 = (encoding == 1) ? Encoding.Unicode : (encoding == 2) ? Encoding.UTF8 : Encoding.GetEncoding(1251);
 		Current[tn] += ProgressBarStep;
-		if (shet)
-			s = SHET(s, ('\x14', '\x7F'));
-		Current[tn] += ProgressBarStep;
 		var words = DivideIntoWords(s);
 		if (words.Length < 5)
 			throw new EncoderFallbackException();
+		Current[tn] += ProgressBarStep;
+		if (comb)
+		{
+			var combined = words.GetSlice().Combine(words.GetSlice(1), words.GetSlice(2));
+			var min = Max((int)Sqrt(Cbrt(words.Length)), 3);
+			var grouped = combined.PGroup(tn).FilterInPlace(x => x.Group.Length >= min && x.Key.Item1.String != "" && x.Key.Item2.String != "" && x.Key.Item3.String != "");
+			combined.Dispose();
+			words.ReplaceInPlace(grouped.ToDictionary(x => x.Key, x => (G.IEnumerable<Word>)[new(x.Key.Item1.String + (x.Key.Item1.Space ? "," : x.Key.Item2.String is "," or "." ? "." : "") + x.Key.Item2.String + (x.Key.Item2.Space ? "," : x.Key.Item3.String is "," or "." ? "." : "") + x.Key.Item3.String, x.Key.Item3.Space)]));
+			grouped.Dispose();
+			var combined2 = words.GetSlice().Combine(words.GetSlice(1));
+			min = Max((int)Sqrt(Sqrt(words.Length)), 5);
+			var grouped2 = combined2.PGroup(tn).FilterInPlace(x => x.Group.Length >= min && x.Key.Item1.String != "" && x.Key.Item2.String != "" && IsSingleWord(x.Key.Item1.String) && IsSingleWord(x.Key.Item2.String));
+			combined2.Dispose();
+			words.ReplaceInPlace(grouped2.ToDictionary(x => x.Key, x => (G.IEnumerable<Word>)[new(x.Key.Item1.String + (x.Key.Item1.Space ? "," : x.Key.Item2.String is "," or "." ? "." : "") + x.Key.Item2.String, x.Key.Item2.Space)]));
+			grouped2.Dispose();
+		}
 		Current[tn] += ProgressBarStep;
 		Status[tn] = 0;
 		StatusMaximum[tn] = 10;
@@ -29,6 +42,9 @@ internal partial class Compression
 		if (words.Length < uniqueWords.Length * 3)
 			throw new EncoderFallbackException();
 		var uniqueWords2 = uniqueWords.PConvert(x => encoding2.GetBytes(x.String));
+		var joinedWords = ProcessUnicode(uniqueWords2.JoinIntoSingle(), encoding, encoding2);
+		if (fab)
+			FAB(ref joinedWords, tn);
 		Status[tn]++;
 		var uniqueIntervals = RedStarLinq.Fill(uniqueWords.Length, index => new Interval((uint)index, (uint)uniqueWords.Length));
 		var uniqueLists = uniqueIntervals.ToArray(x => new ShortIntervalList[] { [x, new Interval(0, 2)], [x, new(1, 2)] });
@@ -47,7 +63,7 @@ internal partial class Compression
 		c.WriteCount(maxLength);
 		result.Add(lengths.PConvert(x => new ShortIntervalList { new(x, maxLength + 1) }));
 		Status[tn]++;
-		result.Add(uniqueWords2.ConvertAndJoin(l => l.Convert(x => byteLists[x])));
+		result.Add(joinedWords.Convert(x => byteLists[x]));
 		Status[tn]++;
 		result.Add(indexCodes.PConvert((x, index) => uniqueLists[x][words[index].Space ? 1 : 0]));
 		Status[tn]++;
@@ -78,8 +94,9 @@ internal partial class Compression
 			var decoded = result.Wrap(tl =>
 			{
 				var a = 0;
-				var wordsList = tl[0].GetSlice(GetArrayLength(nullIntervals.Length, 8) + 2).Convert(l => encoding2.GetString(tl[1].GetSlice(1)[a..(a += (int)l[0].Lower)].ToArray(x => (byte)x[0].Lower)));
-				return encoding2.GetBytes(new Decoding().DecodeSHET(tl[2].GetSlice(1).ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => l[1].Lower == 1 ? new List<char>(x).Add(' ') : x.ToList())), shet)).Wrap(bl => encoding == 2 && tl[3][0][0].Lower == 1 ? bl.ToNList().Add((byte)tl[3][0][1].Lower) : bl.ToNList());
+				var joinedWords = new Decoding().DecodeUnicode(new Decoding().DecodeFAB(tl[1].GetSlice(1).NConvert(x => (byte)x[0].Lower), fab), encoding, encoding2).ToArray();
+				var wordsList = tl[0].GetSlice(GetArrayLength(nullIntervals.Length, 8) + 2).Convert(l => encoding2.GetString(joinedWords[a..(a += (int)l[0].Lower)]));
+				return encoding2.GetBytes(RedStarLinq.ToString(tl[2].GetSlice(1).ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => new Decoding().DecodeCOMB(l[1].Lower == 1 ? [.. x, ' '] : x.ToList(), comb))))).Wrap(bl => encoding == 2 && tl[3][0][0].Lower == 1 ? bl.ToNList().Add((byte)tl[3][0][1].Lower) : bl.ToNList());
 			});
 			for (var i = 0; i < original.Length; i++)
 				if (original[i] != decoded[i])
@@ -92,6 +109,8 @@ internal partial class Compression
 #endif
 		return result;
 	}
+
+	private static bool IsSingleWord(string s) => s.Length <= 2 || !s.Any(x => x is ',' or '.');
 
 	private string AdaptEncoding(out uint encoding, out ListHashSet<int> nulls, out byte? redundantByte)
 	{
@@ -178,7 +197,7 @@ internal partial class Compression
 	{
 		List<Word> outputWords = [];
 		var wordStart = 0;
-		var state = 0; //0 - начальное состояние, 1 - прописные буквы, 2 - строчные буквы, 3 - цифры, 4 - пробел, 5 - перевод строки #1, 6 - перевод строки #2, 7 - управляющий символ SHET, 8 - второй символ SHET, 9 - управляющий символ предлога SHET, 10 - второй символ предлога SHET, 11 - прочие символы.
+		var state = 0; //0 - начальное состояние, 1 - прописные буквы, 2 - строчные буквы, 3 - цифры, 4 - пробел, 5 - перевод строки #1, 6 - перевод строки #2, 7 - прочие символы.
 		var space = false;
 		Status[tn] = 0;
 		StatusMaximum[tn] = text.Length;
@@ -194,30 +213,19 @@ internal partial class Compression
 				space = true;
 				state = 4;
 			}
-			else if (state is 7 or 9)
-			{
-				if (new Decoding().DecodeSHETChar(text[i]) < (state == 7 ? SHETThreshold1 : SHETThreshold2))
-					state = 2;
-				else
-					state++;
-			}
-			else if (state is 8 or 10)
-				state = 2;
 			else if (text[i] is >= 'A' and <= 'Z' or >= 'А' and <= 'Я')
 			{
 				switch (state)
 				{
 					case 0:
 					case 1:
-					case >= 7 and <= 10:
 					break;
 					default:
 					outputWords.Add(new Word(text[wordStart..(i - (space ? 1 : 0))], space));
 					wordStart = i;
 					break;
 				}
-				if (state is not (>= 7 and <= 10))
-					state = 1;
+				state = 1;
 			}
 			else if (text[i] is >= 'a' and <= 'z' or >= 'а' and <= 'я')
 			{
@@ -226,15 +234,13 @@ internal partial class Compression
 					case 0:
 					case 1:
 					case 2:
-					case >= 7 and <= 10:
 					break;
 					default:
 					outputWords.Add(new Word(text[wordStart..(i - (space ? 1 : 0))], space));
 					wordStart = i;
 					break;
 				}
-				if (state is not (>= 7 and <= 10))
-					state = 2;
+				state = 2;
 			}
 			else if (text[i] is >= '0' and <= '9')
 			{
@@ -265,20 +271,9 @@ internal partial class Compression
 				}
 				state = 6;
 			}
-			else if (text[i] == '\x14')
-			{
-				if (state is 1 or 2 or >= 7 and <= 10)
-					state = 7;
-				else
-				{
-					outputWords.Add(new Word(text[wordStart..(i - (space ? 1 : 0))], space));
-					wordStart = i;
-					state = 9;
-				}
-			}
 			else
 			{
-				state = 11;
+				state = 7;
 				outputWords.Add(new Word(text[wordStart..(i - (space ? 1 : 0))], space));
 				wordStart = i;
 			}
@@ -287,5 +282,84 @@ internal partial class Compression
 		}
 		outputWords.Add(new Word(text[wordStart..^(space ? 1 : 0)], space));
 		return outputWords.Filter(x => x.String != "" || x.Space);
+	}
+
+	private static NList<byte> ProcessUnicode(G.IList<byte> input, uint encoding, Encoding encoding2)
+	{
+		if (encoding == 0 || input.Count < 2)
+			return input.ToNList();
+		NList<byte> result = new(input.Count);
+		if (encoding == 1)
+		{
+			for (var i = 0; i < input.Count; i += 2)
+			{
+				if (i == input.Count - 1)
+					result.Add(input[i]);
+				if (input[i] < ValuesInByte >> 1 && input[i + 1] == 0)
+					result.Add(input[i]);
+				else if (UnicodeDic[0].TryGetValue((input[i], input[i + 1]), out var value))
+					result.Add(value);
+				else
+					result.AddRange([0, input[i], input[i + 1]]);
+			}
+			return result;
+		}
+		if (encoding != 2)
+			return input.ToNList();
+		var prev = -1;
+		for (var i = 0; i < input.Count; i++)
+		{
+			if (input[i] < ValuesInByte >> 1)
+				result.Add(input[i]);
+			else if (prev != -1)
+			{
+				if (UnicodeDic[1].TryGetValue(((byte)prev, input[i]), out var value))
+					result.Add(value);
+				else
+					result.AddRange([0, (byte)prev, input[i]]);
+				prev = -1;
+			}
+			else if (input[i] is >= 0b11000000 and <= 0b11011111)
+				prev = input[i];
+			else if (input[i] is >= 0b10000000 and <= 0b10111111)
+				result.Add(input[i]);
+			else
+				result.AddRange([0, input[i]]);
+		}
+		return result;
+	}
+
+	private static void FAB(ref NList<byte> joinedWords, int tn)
+	{
+		using var extraBytes = new Chain(ValuesInByte).Convert(x => (byte)x).ToHashSet().ExceptWith(joinedWords);
+		var combined = joinedWords.GetSlice().NCombine(joinedWords.GetSlice(1), joinedWords.GetSlice(2));
+		var min = Max((int)Cbrt(joinedWords.Length), 10);
+		var grouped = combined.PGroup(tn).FilterInPlace(x => x.Group.Length >= min).NSort(x => (uint)(0xffffffff - x.Group.Length));
+		var groupedPart = grouped.Take(extraBytes.Length);
+		combined.Dispose();
+		int index = 0, index2 = 0;
+		joinedWords = [(byte)groupedPart.Length, .. groupedPart.ConvertAndJoin(x => (byte[])[extraBytes[index++], x.Key.Item1, x.Key.Item2, x.Key.Item3]), .. joinedWords.Replace(groupedPart.ToDictionary(x => x.Key, x => (G.IEnumerable<byte>)[extraBytes[index2++]]))];
+		groupedPart.Dispose();
+		if (extraBytes.Length != groupedPart.Length)
+		{
+			if (joinedWords.Length < groupedPart.Length * 4 + 3)
+				return;
+			var first = extraBytes[0];
+			extraBytes.Remove(0, groupedPart.Length);
+			var combined2 = joinedWords.GetSlice(groupedPart.Length * 4 + 1).Combine(joinedWords.GetSlice(groupedPart.Length * 4 + 2));
+			min = Max((int)Sqrt(joinedWords.Length), 30);
+			var grouped2 = combined2.PGroup(tn).FilterInPlace(x => x.Group.Length >= min).Take(extraBytes.Length);
+			combined2.Dispose();
+			index = index2 = 0;
+			joinedWords = [.. joinedWords.GetRange(0, groupedPart.Length * 4 + 1), ValuesInByte - 1, .. grouped2.ConvertAndJoin(x => (byte[])[extraBytes[index++], x.Key.Item1, x.Key.Item2]), first, .. joinedWords.GetRange(groupedPart.Length * 4 + 1).Replace(grouped2.ToDictionary(x => x.Key, x => (G.IEnumerable<byte>)[extraBytes[index2++]]))];
+			grouped2.Dispose();
+		}
+		//else if (grouped.Length != groupedPart.Length)
+		//{
+		//	using var extraBytes2 = joinedWords.PGroup(tn).NConvert(x => (x.Key, x.Group.Length)).Sort(x => (uint)x.Length).FilterInPlace(x => !extraBytes.Contains(x.Key)).TakeWhile((x, index) => x.Length < grouped[extraBytes.Length + index].Group.Length);
+		//	joinedWords = [.. joinedWords.GetRange(0, groupedPart.Length * 4 + 1), (byte)extraBytes2.Length, .. grouped.GetSlice(extraBytes.Length, extraBytes2.Length).ConvertAndJoin((x, index) => (byte[])[extraBytes2[index].Key, x.Key.Item1, x.Key.Item2, x.Key.Item3]), .. joinedWords.GetRange(groupedPart.Length * 4 + 1).Replace(extraBytes2.ToNList().Add((extraBytes[0], 0)).ToDictionary(x => x.Key, x => (G.IEnumerable<byte>)[extraBytes[0], x.Key])).Replace(extraBytes2.ToDictionary(x => grouped[index2++].Key, x => (G.IEnumerable<byte>)[x.Key]))];
+		//}
+		else
+			joinedWords.Insert(groupedPart.Length * 4 + 1, [ValuesInByte - 1, extraBytes[0]]);
 	}
 }

@@ -7,7 +7,6 @@ global using System.Threading;
 global using System.Threading.Tasks;
 global using UnsafeFunctions;
 global using G = System.Collections.Generic;
-global using static AresGlobalMethods005.Decoding;
 global using static AresTLib005.DecodingExtents;
 global using static Corlib.NStar.Extents;
 global using static System.Math;
@@ -42,10 +41,10 @@ public class Decoding
 		var byteList = ProcessMisc(compressedFile);
 		Current[0] += ProgressBarStep;
 		if (rle == 14)
-			byteList = DecodeRLE3(byteList);
+			byteList = new RLEDec(byteList).DecodeRLE3();
 		Current[0] += ProgressBarStep;
 		if (rle == 7)
-			byteList = DecodeRLE(byteList);
+			byteList = new RLEDec(byteList).Decode();
 		return [.. byteList];
 	}
 

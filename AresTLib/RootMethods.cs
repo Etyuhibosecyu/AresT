@@ -79,7 +79,7 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 		LZData[] lzData = [new(), new(), new()];
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 9;
-		ctl = MakeWordsSplit((PresentMethods & UsedMethods.SHET2) != 0);
+		ctl = MakeWordsSplit((PresentMethods & UsedMethods.COMB2) != 0, (PresentMethods & UsedMethods.FAB2) != 0);
 		if (ctl.Length == 0)
 			throw new EncoderFallbackException();
 		Subtotal[tn] += ProgressBarStep;
@@ -114,7 +114,7 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < cs2.Length && s.Length > 0)
 		{
-			hf = 4 + ((PresentMethods & UsedMethods.SHET2) != 0 ? 2 : 1);
+			hf = 4 + ((PresentMethods & UsedMethods.FAB2) != 0 ? 2 : 1);
 			cs = s;
 		}
 	}
@@ -153,7 +153,7 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 		List<List<ShortIntervalList>> ctl;
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 7;
-		ctl = MakeWordsSplit((PresentMethods & UsedMethods.SHET4) != 0);
+		ctl = MakeWordsSplit((PresentMethods & UsedMethods.COMB4) != 0, (PresentMethods & UsedMethods.FAB4) != 0);
 		if (ctl.Length is not (3 or 4))
 			throw new EncoderFallbackException();
 		Subtotal[tn] += ProgressBarStep;
@@ -163,7 +163,7 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < cs.Length && s.Length > 0)
 		{
-			hf = 4 + ((PresentMethods & UsedMethods.SHET4) != 0 ? 2 : 1);
+			hf = 4 + ((PresentMethods & UsedMethods.FAB4) != 0 ? 2 : 1);
 			cs = s;
 		}
 	}
@@ -204,7 +204,7 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 		byte[] s;
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 2;
-		var ctl = MakeWordsSplit((PresentMethods & UsedMethods.SHET7) != 0);
+		var ctl = MakeWordsSplit((PresentMethods & UsedMethods.COMB7) != 0, (PresentMethods & UsedMethods.FAB7) != 0);
 		if (ctl.Length == 0)
 			throw new EncoderFallbackException();
 		Subtotal[tn] += ProgressBarStep;
@@ -214,7 +214,7 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < originalFile.Length && s.Length > 0)
 		{
-			indicator = (PresentMethods & UsedMethods.SHET7) != 0 ? 67 : 66;
+			indicator = (PresentMethods & UsedMethods.FAB7) != 0 ? 67 : 66;
 			cs = s;
 		}
 	}

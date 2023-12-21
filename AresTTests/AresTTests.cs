@@ -67,19 +67,19 @@ public partial class DecompressionTests
 	}
 
 	[TestMethod]
-	public void TestHFW_SHET()
+	public void TestHFW_COMB()
 	{
 		Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-		PresentMethods = UsedMethods.CS2 | UsedMethods.SHET2;
+		PresentMethods = UsedMethods.CS2 | UsedMethods.COMB2;
 		foreach (var file in files)
 			MainClass.MainThread(file, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-" + Environment.ProcessId + ".tmp", MainClass.Compress, false);
 	}
 
 	[TestMethod]
-	public void TestHFW_LZ_SHET()
+	public void TestHFW_LZ_COMB()
 	{
 		Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-		PresentMethods = UsedMethods.CS2 | UsedMethods.LZ2 | UsedMethods.SHET2;
+		PresentMethods = UsedMethods.CS2 | UsedMethods.LZ2 | UsedMethods.COMB2;
 		foreach (var file in files)
 			MainClass.MainThread(file, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-" + Environment.ProcessId + ".tmp", MainClass.Compress, false);
 	}
@@ -112,10 +112,10 @@ public partial class DecompressionTests
 	}
 
 	[TestMethod]
-	public void TestHFW_BWT_SHET()
+	public void TestHFW_BWT_COMB()
 	{
 		Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-		PresentMethods = UsedMethods.CS4 | UsedMethods.SHET4;
+		PresentMethods = UsedMethods.CS4 | UsedMethods.COMB4;
 		foreach (var file in files)
 			MainClass.MainThread(file, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-" + Environment.ProcessId + ".tmp", MainClass.Compress, false);
 	}
@@ -124,7 +124,6 @@ public partial class DecompressionTests
 	public void TestProgramLogDecompression()
 	{
 		Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-		PresentMethods = UsedMethods.CS4 | UsedMethods.SHET4;
 		foreach (var file in programLogFiles)
 		{
 			MainClass.MainThread(file, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp", MainClass.Decompress, false);
@@ -137,7 +136,6 @@ public partial class DecompressionTests
 	public void TestWAPDecompression()
 	{
 		Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-		PresentMethods = UsedMethods.CS4 | UsedMethods.SHET4;
 		foreach (var file in wapFiles)
 		{
 			MainClass.MainThread(file, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresT-decompressed.tmp", MainClass.Decompress, false);

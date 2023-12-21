@@ -246,24 +246,4 @@ internal partial class Compression
 			return input;
 		}
 	}
-
-	private string SHET(string originalString, (char Starter, char Escape) specialSymbols)
-	{
-		Status[tn] = 0;
-		StatusMaximum[tn] = originalString.Length;
-		var pattern1 = @"(?<=[A-Za-zА-Яа-я])(?<!" + specialSymbols.Starter + "(?:[\x01-\x1F\x21-\x7F" + Encoding1251.GetString(new Chain(ValuesInByte >> 1, SHETThreshold2 - (ValuesInByte >> 1)).ToArray(x => (byte)x)) + "]?|(?:[" + Encoding1251.GetString(new Chain(SHETThreshold2, ValuesInByte - SHETThreshold2).ToArray(x => (byte)x)) + "]?).?))(?:" + string.Join('|', SHETEndinds.GetSlice(1..5).ToArray(x => string.Join('|', x.Filter(x => x.Length > 2).SortDesc(x => x.Length).ToArray()))) + ")";
-		var pattern2 = @"(?<![A-Za-zА-Яа-я" + specialSymbols.Escape + "]|" + specialSymbols.Starter + "(?:[\x01-\x1F\x21-\x7F" + Encoding1251.GetString(new Chain(ValuesInByte >> 1, SHETThreshold2 - (ValuesInByte >> 1)).ToArray(x => (byte)x)) + "]?|(?:[" + Encoding1251.GetString(new Chain(SHETThreshold2, ValuesInByte - SHETThreshold2).ToArray(x => (byte)x)) + "]?).?))(?:" + string.Join('|', SHETEndinds.GetSlice(4..).JoinIntoSingle().Filter(x => x.Length > 2).SortDesc(x => x.Length).ToArray()) + ")";
-		return Regex.Replace(Regex.Replace(originalString.Replace("" + specialSymbols.Starter, "" + specialSymbols.Escape + specialSymbols.Starter), pattern2, x => GetSHETReplacer(x, specialSymbols, SHETHS2, SHETThreshold2)), pattern1, x => GetSHETReplacer(x, specialSymbols, SHETHS1, SHETThreshold1));
-	}
-
-	private string GetSHETReplacer(Match x, (char Starter, char Escape) specialSymbols, ListHashSet<string> hs, int threshold)
-	{
-		Status[tn] = x.Index;
-		if (!hs.TryGetIndexOf(x.Value, out var index))
-			return x.Value;
-		var s = index < threshold ? "" + specialSymbols.Starter + ToSHETChar(index) : "" + specialSymbols.Starter + ToSHETChar((index - threshold) / (ValuesInByte - 2) + threshold) + ToSHETChar((index - threshold) % (ValuesInByte - 2));
-		return s.Length < x.Length ? s : x.Value;
-	}
-
-	private static char ToSHETChar(int x) => Encoding1251.GetChars([(byte)(x + (x >= 31 ? 2 : 1))])[0];
 }

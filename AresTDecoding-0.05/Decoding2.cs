@@ -6,8 +6,8 @@ public class Decoding2
 	protected Decoding decoding = default!;
 	protected ArithmeticDecoder ar = default!;
 	protected ListHashSet<int> nulls = default!;
-	protected int maxFrequency, frequencyCount, hf, bwt, lz, counter, n;
-	protected uint encoding, maxLength, lzRDist, lzMaxDist, lzThresholdDist, lzRLength, lzMaxLength, lzThresholdLength, lzUseSpiralLengths, lzRSpiralLength, lzMaxSpiralLength, lzThresholdSpiralLength;
+	protected int maxFrequency, frequencyCount, hf, bwt, lz, lzRDist, lzRLength, lzRSpiralLength, counter, n;
+	protected uint encoding, maxLength, lzMaxDist, lzThresholdDist, lzMaxLength, lzThresholdLength, lzUseSpiralLengths, lzMaxSpiralLength, lzThresholdSpiralLength;
 	protected MethodDataUnit lzDist = new(), lzLength = new(), lzSpiralLength = new();
 	protected LZData lzData = default!;
 	protected List<uint> arithmeticMap = default!;
@@ -44,7 +44,7 @@ public class Decoding2
 		if (lz != 0)
 		{
 			var counter2 = 7;
-			lzRDist = ar.ReadEqual(3);
+			lzRDist = (int)ar.ReadEqual(3);
 			lzMaxDist = ar.ReadCount(16);
 			if (lzRDist != 0)
 			{
@@ -52,7 +52,7 @@ public class Decoding2
 				counter2++;
 			}
 			lzDist = (lzRDist, lzMaxDist, lzThresholdDist);
-			lzRLength = ar.ReadEqual(3);
+			lzRLength = (int)ar.ReadEqual(3);
 			lzMaxLength = ar.ReadCount(16);
 			if (lzRLength != 0)
 			{
@@ -68,7 +68,7 @@ public class Decoding2
 			lzUseSpiralLengths = ar.ReadEqual(2);
 			if (lzUseSpiralLengths == 1)
 			{
-				lzRSpiralLength = ar.ReadEqual(3);
+				lzRSpiralLength = (int)ar.ReadEqual(3);
 				lzMaxSpiralLength = ar.ReadCount(16);
 				counter2 += 3;
 				if (lzRSpiralLength != 0)

@@ -215,7 +215,7 @@ void ThreadBool(bool startImmediate)
 		try
 		{
 			is_working = true;
-			SendMessageToClient(0, [.. Encoding.UTF8.GetBytes(filename).Prepend((byte)1)]);
+			SendMessageToClient(0, [1, .. Encoding.UTF8.GetBytes(filename)]);
 #if !DEBUG
 			compressionStart = DateTime.Now;
 #endif
@@ -235,7 +235,7 @@ void ThreadBool(bool startImmediate)
 		try
 		{
 			is_working = true;
-			SendMessageToClient(0, [.. Encoding.UTF8.GetBytes(filename).Prepend((byte)2)]);
+			SendMessageToClient(0, [2, .. Encoding.UTF8.GetBytes(filename)]);
 #if !DEBUG
 			compressionStart = DateTime.Now;
 #endif
@@ -255,7 +255,7 @@ void ThreadBool(bool startImmediate)
 		try
 		{
 			is_working = true;
-			SendMessageToClient(0, [.. Encoding.UTF8.GetBytes(filename).Prepend((byte)3)]);
+			SendMessageToClient(0, [3, .. Encoding.UTF8.GetBytes(filename)]);
 #if !DEBUG
 			compressionStart = DateTime.Now;
 #endif
@@ -320,7 +320,7 @@ void Stop(object? sender, ConsoleCancelEventArgs e)
 void SendUsedMethods()
 {
 	if (netStream.Length != 0)
-		SendMessageToClient(0, [.. BitConverter.GetBytes((int)usedMethods).Prepend((byte)0)]);
+		SendMessageToClient(0, [0, .. BitConverter.GetBytes((int)usedMethods)]);
 }
 
 if (ExecFunction.IsExecFunctionCommand(args))
@@ -362,11 +362,11 @@ Start, Optimus, Pro, Pro+, Unlim - установить один из оптим
 +<method>, -<method> - включить или отключить метод (можно указать несколько на строку)
 Возможные методы:
 CS1, LZ1, HF1
-CS2, LZ2, SHET2
+CS2, LZ2, COMB2, FAB2
 CS3, AHF3
-CS4, SHET4
+CS4, COMB4, FAB4
 CS6
-CS7, SHET7
+CS7, COMB7, FAB7
 Help - помощь (этот текст)
 Exit - выход";
 WriteLine(help);
@@ -451,14 +451,17 @@ while (true)
 			"HF1" => UsedMethods.HF1,
 			"CS2" => UsedMethods.CS2,
 			"LZ2" => UsedMethods.LZ2,
-			"SHET2" => UsedMethods.SHET2,
+			"COMB2" => UsedMethods.COMB2,
+			"FAB2" => UsedMethods.FAB2,
 			"CS3" => UsedMethods.CS3,
 			"AHF3" => UsedMethods.AHF3,
 			"CS4" => UsedMethods.CS4,
-			"SHET4" => UsedMethods.SHET4,
+			"COMB4" => UsedMethods.COMB4,
+			"FAB4" => UsedMethods.FAB4,
 			"CS6" => UsedMethods.CS6,
 			"CS7" => UsedMethods.CS7,
-			"SHET7" => UsedMethods.SHET7,
+			"COMB7" => UsedMethods.COMB7,
+			"FAB7" => UsedMethods.FAB7,
 			_ => UsedMethods.None,
 		};
 		if (s[i][0] == '+')

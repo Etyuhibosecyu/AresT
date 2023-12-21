@@ -54,7 +54,7 @@ internal record class AdaptiveHuffman(int TN)
 		set.Clear();
 		lengthsSL.Replace(lz ? RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2)) : []);
 		distsSL.Replace(lz ? RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1) : []);
-		firstIntervalDist = lz ? lzData.Dist.R == 2 ? lzData.Dist.Max - lzData.Dist.Threshold + 2 : (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
+		firstIntervalDist = lz ? (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
 		if (lz)
 			set.Add((newBase - 1, 1));
 		new AdaptiveHuffmanMain(ar, input, lzData, n, startPos, lz, newBase, set, lengthsSL, distsSL, firstIntervalDist, TN).MainProcess();
@@ -87,14 +87,14 @@ internal record class AdaptiveHuffman(int TN)
 
 file sealed record class AdaptiveHuffmanMain(ArithmeticEncoder Ar, List<ShortIntervalList> Input, LZData LZData, int N, int StartPos, bool LZ, uint NewBase, SumSet<uint> Set, SumList LengthsSL, SumList DistsSL, uint FirstIntervalDist, int TN)
 {
-	private int lzLength, lzDist, lzSpiralLength, frequency;
-	private uint bufferInterval;
+	private int frequency, fullLength;
+	private uint lzLength, lzDist, lzSpiralLength, bufferInterval;
 	private long sum;
 	private uint item;
-	private bool lessThanThreshold = true;
 
 	public void MainProcess()
 	{
+		fullLength = DistsSL.Length;
 		for (var i = StartPos; i < Input.Length; i++, Status[TN]++)
 		{
 			item = Input[i][0].Lower;
@@ -121,7 +121,7 @@ file sealed record class AdaptiveHuffmanMain(ArithmeticEncoder Ar, List<ShortInt
 		if (LZ && item == NewBase - 1)
 		{
 			item = Input[i][j].Lower;
-			lzLength = (int)(item + (LZData.Length.R == 2 ? LZData.Length.Threshold : 0));
+			lzLength = item + (LZData.Length.R == 2 ? LZData.Length.Threshold : 0);
 			sum = LengthsSL.GetLeftValuesSum((int)item, out frequency);
 			Ar.WritePart((uint)sum, (uint)frequency, (uint)LengthsSL.ValuesSum);
 			LengthsSL.Increase((int)item);
@@ -129,20 +129,21 @@ file sealed record class AdaptiveHuffmanMain(ArithmeticEncoder Ar, List<ShortInt
 			if (LZData.Length.R != 0 && item == LengthsSL.Length - 1)
 			{
 				Ar.WritePart(Input[i][j].Lower, Input[i][j].Length, Input[i][j].Base);
-				lzLength = (int)(LZData.Length.R == 2 ? Input[i][j].Lower : Input[i][j].Lower + LZData.Length.Threshold + 1);
+				lzLength = LZData.Length.R == 2 ? Input[i][j].Lower : Input[i][j].Lower + LZData.Length.Threshold + 1;
 				j++;
 			}
 			EncodeDist(i, ref j);
-			lzSpiralLength = LZData.UseSpiralLengths != 0 && Input[i][j - 1].Lower == Input[i][j - 1].Base - 1 ? LZData.SpiralLength.R == 0 ? (int)Input[i][^1].Lower : (int)(Input[i][^1].Lower + (LZData.SpiralLength.R == 1 ? LZData.SpiralLength.Threshold + 2 - LZData.SpiralLength.R : 0)) : 0;
-			if (LZ && DistsSL.Length < FirstIntervalDist)
-				new Chain(Min((int)FirstIntervalDist - DistsSL.Length, (lzLength + 2) * (lzSpiralLength + 1))).ForEach(x => DistsSL.Insert(DistsSL.Length - ((int)LZData.UseSpiralLengths + 1), 1));
+			lzSpiralLength = LZData.UseSpiralLengths != 0 && Input[i][j - 1].Lower == Input[i][j - 1].Base - 1 ? LZData.SpiralLength.R == 0 ? Input[i][^1].Lower : (Input[i][^1].Lower + (LZData.SpiralLength.R == 1 ? LZData.SpiralLength.Threshold + 2 - LZData.SpiralLength.R : 0)) : 0;
+			var fullLengthDelta = (lzLength + 2) * (lzSpiralLength + 1);
+			fullLength += (int)fullLengthDelta;
+			if (DistsSL.Length < FirstIntervalDist)
+				new Chain((int)Min(FirstIntervalDist - DistsSL.Length, fullLengthDelta)).ForEach(x => DistsSL.Insert(DistsSL.Length - ((int)LZData.UseSpiralLengths + 1), 1));
 		}
-		else if (LZ && DistsSL.Length < FirstIntervalDist)
-			DistsSL.Insert(DistsSL.Length - ((int)LZData.UseSpiralLengths + 1), 1);
-		if (LZData.Dist.R == 2 && lessThanThreshold && DistsSL.Length - LZData.UseSpiralLengths - 1 >= LZData.Dist.Threshold)
+		else if (LZ)
 		{
-			DistsSL.Remove(0, (int)(LZData.Dist.Threshold + 1 - LZData.UseSpiralLengths));
-			lessThanThreshold = false;
+			fullLength++;
+			if (DistsSL.Length < FirstIntervalDist)
+				DistsSL.Insert(DistsSL.Length - ((int)LZData.UseSpiralLengths + 1), 1);
 		}
 		for (; j < Input[i].Length; j++)
 			Ar.WritePart(Input[i][j].Lower, Input[i][j].Length, Input[i][j].Base);
@@ -151,16 +152,17 @@ file sealed record class AdaptiveHuffmanMain(ArithmeticEncoder Ar, List<ShortInt
 	private void EncodeDist(int i, ref int j)
 	{
 		item = Input[i][j].Lower;
-		lzDist = (int)(item + (LZData.Dist.R == 2 && DistsSL.Length - LZData.UseSpiralLengths - lzLength - StartPos >= LZData.Dist.Threshold ? LZData.Dist.Threshold : 0));
-		sum = DistsSL.GetLeftValuesSum((int)item, out frequency);
-		Ar.WritePart((uint)sum, (uint)frequency, (uint)DistsSL.ValuesSum);
-		DistsSL.Increase((int)item);
-		j++;
-		if (LZData.Dist.R != 0 && j < Input[i].Length && Input[i][j - 1].Lower == Input[i][j - 1].Base - 1)
+		var addThreshold = fullLength - LZData.UseSpiralLengths - lzLength - StartPos >= LZData.Dist.Threshold;
+		lzDist = item + (LZData.Dist.R == 2 && addThreshold ? LZData.Dist.Threshold : 0);
+		if (LZData.Dist.R == 2 && addThreshold && lzDist == (DistsSL.Length == FirstIntervalDist ? LZData.Dist.Max : fullLength - LZData.UseSpiralLengths - lzLength - StartPos) + 1)
 		{
-			Ar.WritePart(Input[i][j].Lower, Input[i][j].Length, Input[i][j].Base);
 			j++;
+			lzDist = LZData.UseSpiralLengths == 1 && Input[i][j].Lower == LZData.Dist.Threshold ? LZData.Dist.Max + 1 : Input[i][j].Lower;
 		}
+		sum = DistsSL.GetLeftValuesSum((int)lzDist, out frequency);
+		Ar.WritePart((uint)sum, (uint)frequency, (uint)DistsSL.ValuesSum);
+		DistsSL.Increase((int)lzDist);
+		j++;
 	}
 }
 

@@ -114,5 +114,5 @@ public class AdaptiveHuffmanDec
 		fullLength += (int)((length + 2) * (spiralLength + 1));
 	}
 
-	protected virtual List<ShortIntervalList> Postrequisites() => DecodeLempelZiv(result, lz != 0, 0, 0, 0, 0, lzData.UseSpiralLengths, 0, 0, 0);
+	protected virtual List<ShortIntervalList> Postrequisites() => new LempelZivDec(result, lz != 0, new() { UseSpiralLengths = lzData.UseSpiralLengths }, 0).Decode();
 }

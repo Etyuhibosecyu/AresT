@@ -417,7 +417,7 @@ public partial class MainPage : ContentPage
 		try
 		{
 			is_working = true;
-			SendMessageToClient(0, [.. Encoding.UTF8.GetBytes(filename).Prepend((byte)(operation_type + 1))]);
+			SendMessageToClient(0, [(byte)(operation_type + 1), .. Encoding.UTF8.GetBytes(filename)]);
 #if !DEBUG
 				compressionStart = DateTime.Now;
 #endif
@@ -488,14 +488,17 @@ public partial class MainPage : ContentPage
 		CheckBoxHF1.IsChecked = selectedIndex >= 0;
 		CheckBoxCS2.IsChecked = selectedIndex >= 1;
 		CheckBoxLZ2.IsChecked = selectedIndex >= 1;
-		CheckBoxSHET2.IsChecked = false;
+		CheckBoxCOMB2.IsChecked = false;
+		CheckBoxFAB2.IsChecked = false;
 		CheckBoxCS3.IsChecked = selectedIndex >= 2;
 		CheckBoxCS4.IsChecked = selectedIndex >= 2;
-		CheckBoxSHET4.IsChecked = false;
+		CheckBoxCOMB4.IsChecked = false;
+		CheckBoxFAB4.IsChecked = false;
 		CheckBoxCS5.IsChecked = false;
 		CheckBoxCS6.IsChecked = selectedIndex >= 3;
 		CheckBoxCS7.IsChecked = selectedIndex >= 4;
-		CheckBoxSHET7.IsChecked = false;
+		CheckBoxCOMB7.IsChecked = false;
+		CheckBoxFAB7.IsChecked = false;
 		SendUsedMethods();
 	}
 
@@ -601,9 +604,15 @@ public partial class MainPage : ContentPage
 		SendUsedMethods();
 	}
 
-	private void CheckBoxSHET2_CheckedChanged(object? sender, EventArgs e)
+	private void CheckBoxCOMB2_CheckedChanged(object? sender, EventArgs e)
 	{
-		usedMethods ^= UsedMethods.SHET2;
+		usedMethods ^= UsedMethods.COMB2;
+		SendUsedMethods();
+	}
+
+	private void CheckBoxFAB2_CheckedChanged(object? sender, EventArgs e)
+	{
+		usedMethods ^= UsedMethods.FAB2;
 		SendUsedMethods();
 	}
 
@@ -613,22 +622,34 @@ public partial class MainPage : ContentPage
 		SendUsedMethods();
 	}
 
-	private void CheckBoxSHET4_CheckedChanged(object? sender, EventArgs e)
+	private void CheckBoxCOMB4_CheckedChanged(object? sender, EventArgs e)
 	{
-		usedMethods ^= UsedMethods.SHET4;
+		usedMethods ^= UsedMethods.COMB4;
 		SendUsedMethods();
 	}
 
-	private void CheckBoxSHET7_CheckedChanged(object? sender, EventArgs e)
+	private void CheckBoxFAB4_CheckedChanged(object? sender, EventArgs e)
 	{
-		usedMethods ^= UsedMethods.SHET7;
+		usedMethods ^= UsedMethods.FAB4;
+		SendUsedMethods();
+	}
+
+	private void CheckBoxCOMB7_CheckedChanged(object? sender, EventArgs e)
+	{
+		usedMethods ^= UsedMethods.COMB7;
+		SendUsedMethods();
+	}
+
+	private void CheckBoxFAB7_CheckedChanged(object? sender, EventArgs e)
+	{
+		usedMethods ^= UsedMethods.FAB7;
 		SendUsedMethods();
 	}
 
 	private void SendUsedMethods()
 	{
 		if (netStream.Length != 0)
-			SendMessageToClient(0, [.. BitConverter.GetBytes((int)usedMethods).Prepend((byte)0)]);
+			SendMessageToClient(0, [0, .. BitConverter.GetBytes((int)usedMethods)]);
 	}
 
 	private readonly Grid[] ThreadsLayout;
