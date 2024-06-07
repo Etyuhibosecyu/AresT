@@ -30,7 +30,7 @@ internal record class LZMA(int TN)
 		Parallel.ForEach(indexCodes, x => FindMatchesRecursive(x, 0));
 		var (blockStartValue, blockEscapeValue, bitsCount, blockStartIndexes) = LZMABlockStart(bitList);
 		var blockStart = new BitList(bitsCount, blockStartValue).Convert(x => new ShortIntervalList() { new(x ? 1u : 0, 2) });
-		var repeatsInfoSum = repeatsInfo.JoinIntoSingle().ToDictionary();
+		var repeatsInfoSum = repeatsInfo.JoinIntoSingle().ToNList();
 		LZRequisites(bitList.Length, BitsPerByte, repeatsInfoSum, out var boundIndex, out var repeatsInfoList2, out var starts, out var dists, out var lengths, out var spiralLengths, out var maxDist, out var maxLength, out var maxSpiralLength, out var rDist, out var thresholdDist, out var rLength, out var thresholdLength, out var rSpiralLength, out var thresholdSpiralLength, PrimitiveType.UIntType);
 		var result = bitList.Convert(x => new ShortIntervalList() { new(x ? 1u : 0, 2) });
 		Status[TN] = 0;
@@ -146,7 +146,7 @@ internal record class LZMA(int TN)
 		}
 	}
 
-	private static (uint Value, uint Escape, int bitsCount, List<int> ValueIndexes) LZMABlockStart(BitList bitList)
+	private static (uint Value, uint Escape, int bitsCount, NList<int> ValueIndexes) LZMABlockStart(BitList bitList)
 	{
 		using NList<int> ranges = [];
 		for (var i = 2; i <= BitsPerByte; i++)

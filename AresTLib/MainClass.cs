@@ -21,7 +21,7 @@ public static class MainClass
 	{
 #if !RELEASE
 		args = ["11000"];
-		Thread.Sleep(MillisecondsPerSecond * 5);
+		Thread.Sleep(MillisecondsPerSecond * 2);
 #endif
 		if (!(args.Length != 0 && int.TryParse(args[0], out var port) && port >= 1024 && port <= 65535))
 			return;
@@ -86,9 +86,9 @@ public static class MainClass
 			{
 				if (netStream != null)
 				{
-					netStream.Read(receiveLen, 0, 4);//чтение сообщения
+					netStream.ReadExactly(receiveLen);//чтение сообщения
 					receiveMessage = new byte[BitConverter.ToInt32(receiveLen)];
-					netStream.Read(receiveMessage, 0, receiveMessage.Length);
+					netStream.ReadExactly(receiveMessage);
 					WorkUpReceiveMessage(receiveMessage);
 				}
 				else
@@ -107,15 +107,19 @@ public static class MainClass
 		{
 			if (message[0] == 0)
 				PresentMethods = (UsedMethods)BitConverter.ToInt32(message.AsSpan(1..));
+			else if (message[0] == 1)
+			{
+				FragmentLength = 1000000 << Min(BitConverter.ToInt32(message.AsSpan(1..)) & 0xF, 11);
+			}
 			else if (message[0] <= 4)
 			{
 				var filename = Encoding.UTF8.GetString(message[1..]);
-				thread = new(message[0] switch
+				thread = new((message[0] - 2) switch
 				{
-					1 => () => MainThread(filename, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\" + Path.GetFileNameWithoutExtension(filename), Decompress),
-					2 => () => MainThread(filename, filename + ".ares-t", Compress),
-					3 => () => MainThread(filename, Path.GetDirectoryName(filename) + @"\" + Path.GetFileNameWithoutExtension(filename), Decompress),
-					4 => () => MainThread(filename, filename, Recompress),
+					0 => () => MainThread(filename, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\" + Path.GetFileNameWithoutExtension(filename), Decompress),
+					1 => () => MainThread(filename, filename + ".ares-t", Compress),
+					2 => () => MainThread(filename, Path.GetDirectoryName(filename) + @"\" + Path.GetFileNameWithoutExtension(filename), Decompress),
+					3 => () => MainThread(filename, filename, Recompress),
 					_ => throw new NotImplementedException(),
 				})
 				{ Name = "Основной процесс" };
@@ -201,7 +205,7 @@ public static class MainClass
 		Thread.Sleep(MillisecondsPerSecond);
 		while (isWorking)
 		{
-			List<byte> list =
+			NList<byte> list =
 			[
 				0,
 				.. BitConverter.GetBytes(Supertotal),
@@ -283,7 +287,7 @@ public static class MainClass
 				if (leftLength != 0)
 					bytes = new byte[leftLength];
 			}
-			rfs.Read(bytes, 0, bytes.Length);
+			rfs.ReadExactly(bytes);
 			var s = new Executions(bytes).Encode();
 			if (fragmentCount != 1)
 				wfs.Write([(byte)(s.Length >> (BitsPerByte << 1)), (byte)(s.Length >> BitsPerByte), (byte)s.Length], 0, 3);
@@ -302,8 +306,8 @@ public static class MainClass
 				var length = (int)Min(rfs.Length - i, FragmentLength);
 				if (length < FragmentLength)
 					bytes2 = new byte[length];
-				rfs.Read(bytes2, 0, length);
-				wfs.Write(bytes2, 0, length);
+				rfs.ReadExactly(bytes2);
+				wfs.Write(bytes2);
 			}
 			wfs.SetLength(wfs.Position);
 		}
@@ -311,18 +315,20 @@ public static class MainClass
 
 	public static void Decompress(FileStream rfs, FileStream wfs)
 	{
+		PreservedFragmentLength = FragmentLength;
+		FragmentLength = 2048000000;
 		var readByte = (byte)rfs.ReadByte();
 		var encodingVersion = (byte)(readByte & 63);
 		if (encodingVersion == 0)
 		{
-			var bytes2 = rfs.Length < FragmentLength ? default! : new byte[FragmentLength];
-			for (var i = 1; i < rfs.Length; i += FragmentLength)
+			var bytes2 = rfs.Length < 2048000000 ? default! : new byte[2048000000];
+			for (var i = 1; i < rfs.Length; i += 2048000000)
 			{
-				var length = (int)Min(rfs.Length - i, FragmentLength);
-				if (length < FragmentLength)
+				var length = (int)Min(rfs.Length - i, 2048000000);
+				if (length < 2048000000)
 					bytes2 = new byte[length];
-				rfs.Read(bytes2, 0, length);
-				wfs.Write(bytes2, 0, length);
+				rfs.ReadExactly(bytes2);
+				wfs.Write(bytes2);
 			}
 			wfs.SetLength(wfs.Position);
 			return;
@@ -338,40 +344,48 @@ public static class MainClass
 		{
 			if (fragmentCount == 1)
 			{
-				bytes = new byte[Min(rfs.Length - rfs.Position, FragmentLength + 2)];
-				rfs.Read(bytes, 0, bytes.Length);
+				bytes = new byte[(int)Min(rfs.Length - rfs.Position, 2048000002)];
+				rfs.ReadExactly(bytes);
 			}
 			else
 			{
-				bytes = new byte[3];
-				rfs.Read(bytes, 0, 3);
-				var fragmentLength = Min(bytes[0] * ValuesIn2Bytes + bytes[1] * ValuesInByte + bytes[2], FragmentLength + 2);
+				bytes = new byte[4];
+				rfs.ReadExactly(bytes, 0, 3);
+				var fragmentLength = Min(bytes[0] * ValuesIn2Bytes + bytes[1] * ValuesInByte + bytes[2], 2048000002);
+				if (fragmentLength > 16000010)
+				{
+					rfs.ReadExactly(bytes);
+					fragmentLength = Min(bytes[0] * ValuesIn3Bytes + bytes[1] * ValuesIn2Bytes + bytes[2] * ValuesInByte + bytes[3], 2048000002);
+				}
 				bytes = new byte[fragmentLength];
-				rfs.Read(bytes, 0, bytes.Length);
+				rfs.ReadExactly(bytes);
 			}
 			var s = new Decoding().Decode(bytes, encodingVersion);
 			wfs.Write(s, 0, s.Length);
 			Supertotal += ProgressBarStep;
 			GC.Collect();
 		}
+		FragmentLength = PreservedFragmentLength;
 	}
 
 	private static void Recompress(FileStream rfs, FileStream wfs)
 	{
+		PreservedFragmentLength = FragmentLength;
+		FragmentLength = 2048000000;
 		var readByte = (byte)rfs.ReadByte();
 		var encodingVersion = (byte)(readByte & 63);
 		if (encodingVersion >= ProgramVersion)
 			wfs.WriteByte(readByte);
 		if (encodingVersion is 0 or >= ProgramVersion)
 		{
-			var bytes2 = rfs.Length < FragmentLength ? default! : new byte[FragmentLength];
-			for (var i = 1; i < rfs.Length; i += FragmentLength)
+			var bytes2 = rfs.Length < 2048000000 ? default! : new byte[2048000000];
+			for (var i = 1; i < rfs.Length; i += 2048000000)
 			{
-				var length = (int)Min(rfs.Length - i, FragmentLength);
-				if (length < FragmentLength)
+				var length = (int)Min(rfs.Length - i, 2048000000);
+				if (length < 2048000000)
 					bytes2 = new byte[length];
-				rfs.Read(bytes2, 0, length);
-				wfs.Write(bytes2, 0, length);
+				rfs.ReadExactly(bytes2);
+				wfs.Write(bytes2);
 			}
 			wfs.SetLength(wfs.Position);
 			return;
@@ -387,16 +401,21 @@ public static class MainClass
 		{
 			if (fragmentCount == 1)
 			{
-				bytes = new byte[Min(rfs.Length - rfs.Position, FragmentLength + 2)];
-				rfs.Read(bytes, 0, bytes.Length);
+				bytes = new byte[(int)Min(rfs.Length - rfs.Position, 2048000002)];
+				rfs.ReadExactly(bytes);
 			}
 			else
 			{
-				bytes = new byte[3];
-				rfs.Read(bytes, 0, 3);
-				var fragmentLength = Min(bytes[0] * ValuesIn2Bytes + bytes[1] * ValuesInByte + bytes[2], FragmentLength + 2);
+				bytes = new byte[4];
+				rfs.ReadExactly(bytes, 0, 3);
+				var fragmentLength = (int)Min((uint)bytes[0] * ValuesIn2Bytes + bytes[1] * ValuesInByte + bytes[2], 2048000002);
+				if (fragmentLength == 0xFFFFFF)
+				{
+					rfs.ReadExactly(bytes);
+					fragmentLength = Min(bytes[0] * ValuesIn3Bytes + bytes[1] * ValuesIn2Bytes + bytes[2] * ValuesInByte + bytes[3], 2048000002);
+				}
 				bytes = new byte[fragmentLength];
-				rfs.Read(bytes, 0, bytes.Length);
+				rfs.ReadExactly(bytes);
 			}
 			var s = new Executions(new Decoding().Decode(bytes, encodingVersion)).Encode();
 			if (fragmentCount != 1)
@@ -409,17 +428,18 @@ public static class MainClass
 		{
 			wfs.Seek(0, SeekOrigin.Begin);
 			rfs.Seek(0, SeekOrigin.Begin);
-			var bytes2 = rfs.Length < FragmentLength ? default! : new byte[FragmentLength];
-			for (var i = 0; i < rfs.Length; i += FragmentLength)
+			var bytes2 = rfs.Length < 2048000000 ? default! : new byte[2048000000];
+			for (var i = 0; i < rfs.Length; i += 2048000000)
 			{
-				var length = (int)Min(rfs.Length - i, FragmentLength);
-				if (length < FragmentLength)
+				var length = (int)Min(rfs.Length - i, 2048000000);
+				if (length < 2048000000)
 					bytes2 = new byte[length];
-				rfs.Read(bytes2, 0, length);
-				wfs.Write(bytes2, 0, length);
+				rfs.ReadExactly(bytes2);
+				wfs.Write(bytes2);
 			}
 			wfs.SetLength(wfs.Position);
 		}
+		FragmentLength = PreservedFragmentLength;
 	}
 
 	private static void DecodeFibonacci(FileStream rfs, byte readByte)

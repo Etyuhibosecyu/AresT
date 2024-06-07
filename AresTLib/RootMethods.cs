@@ -189,7 +189,9 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 2;
 		var ppm = new PPM(tn);
-		s = ppm.Encode(input);
+		var input2 = input.GetSlice(1).SplitIntoEqual(16000000);
+		input2[0].Insert(0, input[0]);
+		s = ppm.Encode(input2, true);
 		ppm.Dispose();
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < originalFile.Length && s.Length > 0)
@@ -211,6 +213,9 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 		var ppm = new PPM(tn);
 		s = ppm.Encode(ctl);
 		ppm.Dispose();
+//#if DEBUG
+//		var s2 = new PPMBits(tn).Encode(new(originalFile));
+//#endif
 		Subtotal[tn] += ProgressBarStep;
 		if (s.Length < originalFile.Length && s.Length > 0)
 		{

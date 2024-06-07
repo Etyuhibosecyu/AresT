@@ -6,7 +6,7 @@ public class AdaptiveHuffmanDec : AresTLib007.AdaptiveHuffmanDec
 	private readonly Decoding decoding = default!;
 	protected int lzLength;
 
-	public AdaptiveHuffmanDec(Decoding decoding, ArithmeticDecoder ar, List<byte> skipped, LZData lzData, int lz, int bwt, int n, int counter, bool hfw) : base(decoding, ar, skipped, lzData, lz, bwt, n, counter, hfw)
+	public AdaptiveHuffmanDec(Decoding decoding, ArithmeticDecoder ar, NList<byte> skipped, LZData lzData, int lz, int bwt, int n, int counter, bool hfw) : base(decoding, ar, skipped, lzData, lz, bwt, n, counter, hfw)
 	{
 		this.decoding = decoding;
 		firstIntervalDist = lz != 0 ? (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;

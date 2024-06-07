@@ -10,9 +10,9 @@ public class Decoding2
 	protected uint encoding, maxLength, lzMaxDist, lzThresholdDist, lzMaxLength, lzThresholdLength, lzUseSpiralLengths, lzMaxSpiralLength, lzThresholdSpiralLength;
 	protected MethodDataUnit lzDist = new(), lzLength = new(), lzSpiralLength = new();
 	protected LZData lzData = default!;
-	protected List<uint> arithmeticMap = default!;
-	protected List<Interval> uniqueList = default!;
-	protected List<byte> skipped = default!;
+	protected NList<uint> arithmeticMap = default!;
+	protected NList<Interval> uniqueList = default!;
+	protected NList<byte> skipped = default!;
 	protected bool hfw;
 
 	protected Decoding2() { }
@@ -87,7 +87,7 @@ public class Decoding2
 
 	protected virtual void ProcessNulls()
 	{
-		(encoding, maxLength, var nullsCount) = hfw && n == 0 ? (ar.ReadEqual(3), ar.ReadCount(), ar.ReadCount((uint)BitsCount(decoding.GetFragmentLength()))) : (0, 0, 0);
+		(encoding, maxLength, var nullsCount) = hfw && n == 0 ? (ar.ReadEqual(3), ar.ReadCount(), GetNullsCount()) : (0, 0, 0);
 		if (hfw && n == 0 && nulls != null)
 		{
 			var counter2 = 1;
@@ -104,6 +104,8 @@ public class Decoding2
 			counter -= GetArrayLength(counter2, 4);
 		}
 	}
+
+	protected virtual uint GetNullsCount() => ar.ReadCount((uint)BitsCount(decoding.GetFragmentLength()));
 
 	protected virtual List<ShortIntervalList> ProcessHuffman()
 	{

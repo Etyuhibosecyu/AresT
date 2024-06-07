@@ -112,7 +112,7 @@ public class Decoding
 			if (encoding == 0)
 				result.Insert(x, 0);
 			else
-				result.Insert(x, new byte[] { 0, 0 });
+				result.Insert(x, [0, 0]);
 		return result;
 	});
 
@@ -245,9 +245,9 @@ public class Decoding
 
 	protected virtual Decoding2 CreateDecoding2(ListHashSet<int> nulls, int i) => new(this, ar, nulls, hf, bwt, lz, n = i, hfw);
 
-	protected virtual PPM CreatePPM(uint @base, int n = -1) => new(this, ar, @base, n);
+	protected virtual PPMDec CreatePPM(uint @base, int n = -1) => new(this, ar, @base, n);
 
-	public virtual List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, List<byte> skipped)
+	public virtual List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, NList<byte> skipped)
 	{
 		Status[0] = 0;
 		StatusMaximum[0] = GetArrayLength(input.Length, BWTBlockSize + 2);

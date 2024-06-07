@@ -6,7 +6,7 @@ public class AdaptiveHuffmanDec
 	private readonly Decoding decoding = default!;
 	protected ArithmeticDecoder ar = default!;
 	protected List<ShortIntervalList> result = default!;
-	protected List<byte> skipped = default!;
+	protected NList<byte> skipped = default!;
 	protected SumSet<uint> set = default!;
 	protected List<Interval> uniqueList = default!;
 	protected LZData lzData = default!;
@@ -16,7 +16,7 @@ public class AdaptiveHuffmanDec
 
 	protected AdaptiveHuffmanDec() { }
 
-	public AdaptiveHuffmanDec(Decoding decoding, ArithmeticDecoder ar, List<byte> skipped, LZData lzData, int lz, int bwt, int n, int counter, bool hfw)
+	public AdaptiveHuffmanDec(Decoding decoding, ArithmeticDecoder ar, NList<byte> skipped, LZData lzData, int lz, int bwt, int n, int counter, bool hfw)
 	{
 		this.decoding = decoding;
 		this.ar = ar;

@@ -48,8 +48,6 @@ public class Decoding : AresTLib005.Decoding
 		return [.. byteList.Repeat(repeatsCount)];
 	}
 
-	protected override NList<byte> ProcessMisc1(byte[] compressedFile) => new PPM(this, ar = compressedFile[1..], ValuesInByte).Decode().PNConvert(x => (byte)x[0].Lower);
-
 	protected override NList<byte> ProcessNonMisc(byte[] compressedFile)
 	{
 		if (hf + lz + bwt != 0)
@@ -109,17 +107,17 @@ public class Decoding : AresTLib005.Decoding
 
 	protected override Decoding2 CreateDecoding2(ListHashSet<int> nulls, int i) => new(this, ar, nulls, hf, bwt, lz, n = i, hfw);
 
-	protected override PPM CreatePPM(uint @base, int n = -1) => new(this, ar, @base, n);
+	protected override PPMDec CreatePPM(uint @base, int n = -1) => new(this, ar, @base, n);
 
 	public virtual void GetRepeatsCount()
 	{
-		var repeats = ar.ReadPart(new List<uint>(2, 224, 225));
+		var repeats = ar.ReadPart(new NList<uint>(2, 224, 225));
 		repeatsCount = repeats == 0 ? 1 : (int)ar.ReadCount() + 2;
 		if (repeatsCount > GetFragmentLength() >> 1)
 			throw new DecoderFallbackException();
 	}
 
-	public override List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, List<byte> skipped)
+	public override List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, NList<byte> skipped)
 	{
 		Status[0] = 0;
 		StatusMaximum[0] = GetArrayLength(input.Length, BWTBlockSize + BWTBlockExtraSize);

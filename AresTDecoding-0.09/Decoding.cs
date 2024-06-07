@@ -51,10 +51,13 @@ public enum UsedMethods
 public static class Global
 {
 	public const byte ProgramVersion = 3;
-	public const int FragmentLength = 16000000;
-	public const int BWTBlockSize = 50000;
-	public static int BWTBlockExtraSize => BWTBlockSize <= 0x8000 ? 2 : BWTBlockSize <= 0x800000 ? 3 : BWTBlockSize <= 0x80000000 ? 4 : BWTBlockSize <= 0x8000000000 ? 5 : BWTBlockSize <= 0x800000000000 ? 6 : BWTBlockSize <= 0x80000000000000 ? 7 : 8;
 	public const int WordsListActualParts = 3;
+	public static int BWTBlockSize { get; set; } = 50000;
+#pragma warning disable CS0652 // Сравнение с константой интеграции бесполезно: константа находится за пределами диапазона типа
+	public static int BWTBlockExtraSize => BWTBlockSize <= 0x8000 ? 2 : BWTBlockSize <= 0x800000 ? 3 : BWTBlockSize <= 0x80000000 ? 4 : BWTBlockSize <= 0x8000000000 ? 5 : BWTBlockSize <= 0x800000000000 ? 6 : BWTBlockSize <= 0x80000000000000 ? 7 : 8;
+#pragma warning restore CS0652 // Сравнение с константой интеграции бесполезно: константа находится за пределами диапазона типа
+	public static int FragmentLength { get; set; } = 16000000;
+	public static int PreservedFragmentLength { get; set; } = FragmentLength;
 	public static UsedMethods PresentMethods { get; set; } = UsedMethods.CS1 | UsedMethods.HF1 | UsedMethods.LZ1 | UsedMethods.CS2 | UsedMethods.LZ2;
 	public static Encoding Encoding1251 { get; } = Encoding.GetEncoding(1251);
 	public static Dictionary<(byte, byte), byte>[] UnicodeDic { get; } = new[] { Encoding.Unicode, Encoding.UTF8 }.ToArray(l => new Chain(0x0400, 0x60).ToDictionary(x => ((byte, byte))l.GetBytes("" + (char)x).ToNList(), x => (byte)(x - 0x0400 + 0x80)));
@@ -100,9 +103,14 @@ public class Decoding : AresTLib007.Decoding
 	{
 		if (utf8)
 		{
-			list.Add([[new(ar.ReadEqual(2), 2)]]);
-			if (list[^1][0][0].Lower == 1)
-				list[^1][0].Add(new(ar.ReadEqual(ValuesInByte), ValuesInByte));
+			var leftOffset = ar.ReadCount();
+			list.Add([[new(leftOffset, 0xffffffff)]]);
+			for (var i = 0; i < leftOffset; i++)
+				list[^1].Add([new(ar.ReadEqual(ValuesInByte), ValuesInByte)]);
+			var rightOffset = ar.ReadCount();
+			list[^1].Add([new(rightOffset, 0xffffffff)]);
+			for (var i = 0; i < rightOffset; i++)
+				list[^1].Add([new(ar.ReadEqual(ValuesInByte), ValuesInByte)]);
 		}
 		return list;
 	}
@@ -114,16 +122,16 @@ public class Decoding : AresTLib007.Decoding
 		var a = 0;
 		var joinedWords = new Decoding().DecodeUnicode(DecodeFAB(tl[1].NConvert(x => (byte)x[0].Lower), fab), encoding, encoding2).ToArray();
 		var wordsList = tl[0].GetSlice(..^1).Convert(l => encoding2.GetString(joinedWords[a..(a += (int)l[0].Lower)]));
-		var result = encoding2.GetBytes(RedStarLinq.ToString(tl[2].ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => DecodeCOMB(l[1].Lower == 1 ? [.. x, ' '] : [.. x], true))))).Wrap(bl => encoding == 2 && tl[3][0][0].Lower == 1 ? bl.ToNList().Add((byte)tl[3][0][1].Lower) : bl.ToNList());
+		var result = encoding2.GetBytes(RedStarLinq.ToString(tl[2].ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => DecodeCOMB(l[1].Lower == 1 ? [.. x, ' '] : [.. x], true))))).Wrap(bl => encoding == 2 ? bl.ToNList().Insert(0, tl[3][1..CreateVar((int)(tl[3][0][0].Lower + 1), out var rightStart)].ToArray(x => (byte)x[0].Lower)).AddRange(tl[3][(rightStart + 1)..(int)(rightStart + tl[3][rightStart][0].Lower + 1)].ToArray(x => (byte)x[0].Lower)) : bl.ToNList());
 		foreach (var x in nulls)
 			if (encoding == 0)
 				result.Insert(x, 0);
 			else
-				result.Insert(x, new byte[] { 0, 0 });
+				result.Insert(x, [0, 0]);
 		return result;
 	});
 
-	public override uint GetFragmentLength() => FragmentLength;
+	public override uint GetFragmentLength() => (uint)FragmentLength;
 
 	public override List<ShortIntervalList> ReadCompressedList(HuffmanData huffmanData, int bwt, LZData lzData, int lz, int counter, bool spaceCodes)
 	{
@@ -185,7 +193,9 @@ public class Decoding : AresTLib007.Decoding
 
 	protected override Decoding2 CreateDecoding2(ListHashSet<int> nulls, int i) => new(this, ar, nulls, hf, bwt, lz, n = i, hfw);
 
-	public override List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, List<byte> skipped)
+	protected override PPMDec CreatePPM(uint @base, int n = -1) => new(this, ar, @base, n);
+
+	public override List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, NList<byte> skipped)
 	{
 		Status[0] = 0;
 		StatusMaximum[0] = GetArrayLength(input.Length, BWTBlockSize + BWTBlockExtraSize);
@@ -236,6 +246,9 @@ public class Decoding : AresTLib007.Decoding
 
 	public override NList<byte> DecodeRLEAfterBWT(NList<byte> byteList, ref int i)
 	{
+		if (i >= byteList.Length)
+			throw new DecoderFallbackException();
+		var zero = byteList[i++];
 		NList<byte> result = [];
 		int length, serie, l;
 		byte temp;
@@ -262,7 +275,7 @@ public class Decoding : AresTLib007.Decoding
 			if (serie == 1)
 			{
 				for (var j = 0; j < length; j++)
-					result.Add(0);
+					result.Add(zero);
 				continue;
 			}
 			l = Min(length, byteList.Length - i);
@@ -286,7 +299,7 @@ public class Decoding : AresTLib007.Decoding
 			if (result.Length + length > BWTBlockSize)
 				throw new DecoderFallbackException();
 			for (var j = 0; j < length; j++)
-				result.Add(0);
+				result.Add(zero);
 		}
 		return result;
 	}

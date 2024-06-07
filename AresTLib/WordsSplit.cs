@@ -7,12 +7,13 @@ internal partial class Compression
 	{
 		Current[tn] = 0;
 		CurrentMaximum[tn] = ProgressBarStep * 3;
-		var s = AdaptEncoding(out var encoding, out var nulls, out var redundantByte);
+		var s = AdaptEncoding(out var encoding, out var nulls, out var leftRedundantBytes, out var rightRedundantBytes);
 		if (s == "")
 			throw new EncoderFallbackException();
 		var encoding2 = (encoding == 1) ? Encoding.Unicode : (encoding == 2) ? Encoding.UTF8 : Encoding.GetEncoding(1251);
 		Current[tn] += ProgressBarStep;
 		var words = DivideIntoWords(s);
+		File.WriteAllText(@"D:\AresT.txt", string.Join(", ", words.ToArray(x => "\"" + x + "\"")));
 		if (words.Length < 5)
 			throw new EncoderFallbackException();
 		Current[tn] += ProgressBarStep;
@@ -69,18 +70,19 @@ internal partial class Compression
 		Status[tn]++;
 		if (encoding == 2)
 		{
-			if (redundantByte == null)
-				result.Add([[new(0, 2)]]);
-			else
-			{
-				result.Add([[new(1, 2)]]);
-				result[^1][^1].Add(new(redundantByte.Value, ValuesInByte));
-			}
+			List<Interval> utf8List = [];
+			utf8List.WriteCount((uint)leftRedundantBytes.Length);
+			foreach (var x in leftRedundantBytes)
+				utf8List.Add(new(x, ValuesInByte));
+			utf8List.WriteCount((uint)rightRedundantBytes.Length);
+			foreach (var x in rightRedundantBytes)
+				utf8List.Add(new(x, ValuesInByte));
+			result.Add(utf8List.Convert(x => new ShortIntervalList() { x }));
 		}
 		List<Interval> nullIntervals = [];
-		nullIntervals.WriteCount((uint)nulls.Length, (uint)BitsCount(FragmentLength));
+		nullIntervals.WriteCount((uint)nulls.Length);
 		for (var i = 0; i < nulls.Length; i++)
-			nullIntervals.WriteCount((uint)(nulls[i] - CreateVar(i == 0 ? 0 : nulls[i - 1] + 1, out var prev)), (uint)BitsCount(FragmentLength));
+			nullIntervals.WriteCount((uint)(nulls[i] - CreateVar(i == 0 ? 0 : nulls[i - 1] + 1, out var prev)), (uint)BitsCount((uint)FragmentLength));
 		Status[tn]++;
 		result[0].Insert(0, CreateVar(nullIntervals.SplitIntoEqual(8).Convert(x => new ShortIntervalList(x)), out var splitNullIntervals));
 		result[0].Insert(0, new List<ShortIntervalList>() { new() { LengthsApplied, new(0, (uint)splitNullIntervals.Length + 1, (uint)splitNullIntervals.Length + 1) }, new(c) });
@@ -96,7 +98,7 @@ internal partial class Compression
 				var a = 0;
 				var joinedWords = new Decoding().DecodeUnicode(new Decoding().DecodeFAB(tl[1].GetSlice(1).NConvert(x => (byte)x[0].Lower), fab), encoding, encoding2).ToArray();
 				var wordsList = tl[0].GetSlice(GetArrayLength(nullIntervals.Length, 8) + 2).Convert(l => encoding2.GetString(joinedWords[a..(a += (int)l[0].Lower)]));
-				return encoding2.GetBytes(RedStarLinq.ToString(tl[2].GetSlice(1).ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => new Decoding().DecodeCOMB(l[1].Lower == 1 ? [.. x, ' '] : x.ToList(), comb))))).Wrap(bl => encoding == 2 && tl[3][0][0].Lower == 1 ? bl.ToNList().Add((byte)tl[3][0][1].Lower) : bl.ToNList());
+				return encoding2.GetBytes(RedStarLinq.ToString(tl[2].GetSlice(1).ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => new Decoding().DecodeCOMB(l[1].Lower == 1 ? [.. x, ' '] : x.ToList(), comb))))).Wrap(bl => encoding == 2 ? bl.ToNList().Insert(0, tl[3][2..CreateVar(leftRedundantBytes.Length + 2, out var rightStart)].ToArray(x => (byte)x[0].Lower)).AddRange(tl[3][(rightStart + 2)..(rightStart + rightRedundantBytes.Length + 2)].ToArray(x => (byte)x[0].Lower)) : bl.ToNList());
 			});
 			for (var i = 0; i < original.Length; i++)
 				if (original[i] != decoded[i])
@@ -112,12 +114,12 @@ internal partial class Compression
 
 	private static bool IsSingleWord(string s) => s.Length <= 2 || !s.Any(x => x is ',' or '.');
 
-	private string AdaptEncoding(out uint encoding, out ListHashSet<int> nulls, out byte? redundantByte)
+	private string AdaptEncoding(out uint encoding, out ListHashSet<int> nulls, out NList<byte> leftRedundantBytes, out NList<byte> rightRedundantBytes)
 	{
-		redundantByte = null;
+		leftRedundantBytes = rightRedundantBytes = [];
 		var threadsCount = Environment.ProcessorCount;
 		int[] ansiLetters = new int[threadsCount], utf16Letters = new int[threadsCount], utf8Letters = new int[threadsCount];
-		List<int>[] singleNulls = RedStarLinq.FillArray(threadsCount, _ => new List<int>()), doubleNulls = RedStarLinq.FillArray(threadsCount, _ => new List<int>());
+		NList<int>[] singleNulls = RedStarLinq.FillArray(threadsCount, _ => new NList<int>()), doubleNulls = RedStarLinq.FillArray(threadsCount, _ => new NList<int>());
 		if (originalFile.Length == 0)
 		{
 			encoding = 0;
@@ -165,16 +167,27 @@ internal partial class Compression
 			nulls = doubleNullsSum;
 			return Encoding.Unicode.GetString(originalFile.Filter((x, index) => !doubleNullsSum.Contains(index) && !doubleNullsSum.Contains(index - 1)).ToArray());
 		}
-		else if (utf8LettersSum >= (originalFile.Length + 9) / 10 || utf8LettersSum > ansiLettersSum)
+		else if ((utf8LettersSum >= (originalFile.Length + 9) / 10 || utf8LettersSum > ansiLettersSum) && !originalFile.Exists(x => x >= 0b11111000))
 		{
 			encoding = 2;
 			nulls = doubleNullsSum;
-			if (originalFile[^1] >= ValuesInByte >> 1)
-			{
-				redundantByte = originalFile[^1];
-				return Encoding.UTF8.GetString(originalFile.GetSlice(..^1).Filter((x, index) => !doubleNullsSum.Contains(index) && !doubleNullsSum.Contains(index - 1)).ToArray());
-			}
-			return Encoding.UTF8.GetString(originalFile.Filter((x, index) => !doubleNullsSum.Contains(index) && !doubleNullsSum.Contains(index - 1)).ToArray());
+			var leftOffset = 0;
+			for (; leftOffset < originalFile.Length && originalFile[leftOffset] is >= 0b10000000 and <= 0b10111111; leftOffset++) ;
+			leftRedundantBytes = originalFile[..leftOffset];
+			var rightOffset = 0;
+			for (; rightOffset < originalFile.Length && originalFile[^(rightOffset + 1)] is >= 0b10000000 and <= 0b10111111; rightOffset++) ;
+			if (leftOffset + rightOffset >= originalFile.Length)
+				rightOffset = originalFile.Length - leftOffset;
+			else if (rightOffset >= 3 && originalFile[^(rightOffset + 1)] >= 0b11110000)
+				rightOffset -= 3;
+			else if (rightOffset >= 2 && originalFile[^(rightOffset + 1)] >= 0b11100000)
+				rightOffset -= 2;
+			else if (rightOffset >= 1 && originalFile[^(rightOffset + 1)] >= 0b11000000)
+				rightOffset--;
+			else if (originalFile[^(rightOffset + 1)] >= ValuesInByte >> 1)
+				rightOffset++;
+			rightRedundantBytes = originalFile[^rightOffset..];
+			return Encoding.UTF8.GetString(originalFile.GetSlice(leftOffset..^rightOffset).Filter((x, index) => !doubleNullsSum.Contains(index) && !doubleNullsSum.Contains(index - 1)).ToArray());
 		}
 		else
 		{

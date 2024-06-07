@@ -1,0 +1,489 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+						 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+						 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+						 xmlns:local="clr-namespace:AresT"
+						 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+						 xmlns:spaced="clr-namespace:SpacedGridControl.Avalonia"
+						 xmlns:views="clr-namespace:AresT.Views"
+						 xmlns:vm="clr-namespace:AresT.ViewModels"
+						 mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
+						 x:Class="AresT.Views.MainView"
+						 x:DataType="vm:MainViewModel">
+	<Design.DataContext>
+		<!-- This only sets the DataContext for the previewer in an IDE,
+				 to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+		<vm:MainViewModel />
+	</Design.DataContext>
+
+	<UserControl.Resources>
+		<views:OpacityConverter x:Key="OpacityConverter" />
+	</UserControl.Resources>
+
+	<ScrollViewer>
+		<StackPanel
+			Orientation="Vertical"
+			Spacing="8"
+			VerticalAlignment="Center">
+
+			<views:SpacedGrid
+				ColumnSpacing="8"
+				HorizontalAlignment="Stretch"
+				RowSpacing="8">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="40" />
+					<RowDefinition Height="40" />
+				</Grid.RowDefinitions>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+				<TextBlock
+					Text="Supertotal"
+					FontSize="24" />
+				<ContentControl
+					Grid.Column="1"
+					MinHeight="40">
+					<ProgressBar
+						x:Name="ProgressBarSupertotal"
+						Background="#FFBFDF"
+						Maximum="1"
+						MinHeight="40"
+						Value="0.36"
+						Foreground="#BF8080" />
+				</ContentControl>
+				<TextBlock
+					Grid.Row="1"
+					Text="Total"
+					FontSize="24" />
+				<ContentControl
+					Grid.Column="1"
+					Grid.Row="1"
+					MinHeight="40">
+					<ProgressBar
+						x:Name="ProgressBarTotal"
+						Background="#BFBFFF"
+						Maximum="1"
+						MinHeight="40"
+						Value="0.64"
+						Foreground="#8080BF" />
+				</ContentControl>
+			</views:SpacedGrid>
+
+			<views:SpacedGrid
+				x:Name="GridThreadsProgressBars"
+				HorizontalAlignment="Stretch"
+				RowSpacing="8">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
+				</Grid.RowDefinitions>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="Auto" />
+				</Grid.ColumnDefinitions>
+			</views:SpacedGrid>
+
+			<!--<TabView x:Name="TabView">
+				<TabView.TabHeaderItemTemplate>
+					<DataTemplate>
+						<Button Background="#4080BF"  Text="{Binding Title}" FontSize="12" Command="{Binding Command}" />
+					</DataTemplate>
+				</TabView.TabHeaderItemTemplate>
+				<TabItem x:Name="TabItemImages" Title="Изображения">
+					<TabItem.ContentTemplate>
+						<DataTemplate>
+							<Image
+								HorizontalAlignment="Left"
+								Source="under_development.png"
+								WidthRequest="256" />
+						</DataTemplate>
+					</TabItem.ContentTemplate>
+				</TabItem>
+				<TabItem x:Name="TabItemText" Title="Текст">
+					<TabItem.ContentTemplate>
+						<DataTemplate
+							x:Name="TabItemTextData">-->
+			<StackPanel Orientation="Vertical"
+				x:Name="PanelText"
+				HorizontalAlignment="Left">
+				<Grid
+					x:Name="GridCompressionButtons">
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="Auto" />
+					</Grid.RowDefinitions>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+					</Grid.ColumnDefinitions>
+					<Button
+						x:Name="ButtonOpen"
+						Background="#40BF40"
+						Click="ButtonOpen_Click"
+						Grid.Row="0"
+						HorizontalAlignment="Stretch">
+						<TextBlock
+							Text="Открыть"
+							TextAlignment="Center"
+							FontSize="12" />
+					</Button>
+					<Button
+						x:Name="ButtonOpenForCompression"
+						Background="#8080BF"
+						Click="ButtonOpenForCompression_Click"
+						Grid.Row="1"
+						HorizontalAlignment="Stretch">
+						<TextBlock
+							Text="Открыть для сжатия"
+							TextAlignment="Center"
+							FontSize="12" />
+					</Button>
+					<Button
+						x:Name="ButtonOpenForUnpacking"
+						Background="#BF8040"
+						Click="ButtonOpenForUnpacking_Click"
+						Grid.Row="2"
+						HorizontalAlignment="Stretch">
+						<TextBlock
+							Text="Открыть для распаковки"
+							TextAlignment="Center"
+							FontSize="12" />
+					</Button>
+					<Button
+						x:Name="ButtonOpenForRecompression"
+						Background="#A06040"
+						Click="ButtonOpenForRecompression_Click"
+						Grid.Column="1"
+						Grid.Row="1"
+						HorizontalAlignment="Stretch">
+						<TextBlock
+							Text="Открыть для пересжатия"
+							TextAlignment="Center"
+							FontSize="12" />
+					</Button>
+					<Button
+						x:Name="ButtonStop"
+						Background="#BF4080"
+						Click="ButtonStop_Click"
+						Grid.Column="2"
+						Grid.Row="2"
+						HorizontalAlignment="Stretch">
+						<TextBlock
+							Text="Остановить"
+							TextAlignment="Center"
+							FontSize="12" />
+					</Button>
+				</Grid>
+
+				<Grid
+					x:Name="GridSettings">
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto" />
+					</Grid.RowDefinitions>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="*" />
+					</Grid.ColumnDefinitions>
+					<TextBlock
+						Text="Быстрая настройка: "
+						FontSize="12"
+						VerticalAlignment="Center" />
+					<ComboBox
+						x:Name="ComboQuickSetup"
+						SelectionChanged="ComboQuickSetup_SelectedIndexChanged"
+						Grid.Column="1">
+						<ComboBox.Items>
+							<x:String>Start</x:String>
+							<x:String>Optimus</x:String>
+							<x:String>Pro</x:String>
+							<x:String>Pro+</x:String>
+							<x:String>Unlim</x:String>
+						</ComboBox.Items>
+						<ComboBox.SelectedIndex>1</ComboBox.SelectedIndex>
+					</ComboBox>
+				</Grid>
+
+				<Grid>
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="Auto" />
+					</Grid.RowDefinitions>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+					</Grid.ColumnDefinitions>
+					<CheckBox
+						x:Name="CheckBoxCS1"
+						IsCheckedChanged="CheckBoxCS1_CheckedChanged"
+						IsChecked="True">
+						<TextBlock
+							Text="C-S1" />
+					</CheckBox>
+					<StackPanel
+						Orientation="Vertical"
+						x:Name="PanelCS1"
+						Grid.Row="1"
+						IsEnabled="{Binding IsChecked, ElementName=CheckBoxCS1}">
+						<CheckBox
+							x:Name="CheckBoxLZ1"
+							IsCheckedChanged="CheckBoxLZ1_CheckedChanged"
+							ToolTip.Tip="Лемпель-Зив (LZ) - алгоритм словарного сжатия, кодирующий повторяющиеся группы бит (LZMA), символов или слов. На самом деле Лемпель и Зив - две разные фамилии. В сочетании с Хаффманом является классикой в деле сжатия данных."
+							IsChecked="True">
+							<TextBlock
+								Text="LZ" />
+						</CheckBox>
+						<CheckBox
+							x:Name="CheckBoxHF1"
+							IsCheckedChanged="CheckBoxHF1_CheckedChanged"
+							ToolTip.Tip='Хаффман (Huff, HF) - алгоритм энтропийного сжатия, кодирующий частые элементы короткими кодами, а редкие - длинными. Для HF без специальных обозначений "элементами" являются байты, благодаря чему он быстрый и универсальный, и вместе с Лемпелем-Зивом является классикой в деле сжатия данных, но сжимает часто хуже, чем более специфические алгоритмы.'
+							IsChecked="True">
+							<TextBlock
+								Text="HF" />
+						</CheckBox>
+					</StackPanel>
+					<CheckBox
+						x:Name="CheckBoxCS2"
+						IsCheckedChanged="CheckBoxCS2_CheckedChanged"
+						Grid.Column="1"
+						IsChecked="True">
+						<TextBlock
+							Text="C-S2" />
+					</CheckBox>
+					<StackPanel
+						Orientation="Vertical"
+						x:Name="PanelCS2"
+						Grid.Column="1"
+						Grid.Row="1"
+						IsEnabled="{Binding IsChecked, ElementName=CheckBoxCS2}">
+						<TextBlock
+							ToolTip.Tip="Хаффман для слов (HFW) - историческое название алгоритма энтропийного сжатия, сжимающего слова на естественном (русском, английском) языке. Историческим оно является потому, что 1 - это не Хаффман, а арифметическое кодирование, и 2 - оно ничем не отличается от такого же для байт, а собственно слова кодирует совсем другая функция, и между ними можно вставить что-то еще, например, Лемпель-Зив."
+							Text="  ✓     HFW" />
+						<CheckBox
+							x:Name="CheckBoxLZ2"
+							IsCheckedChanged="CheckBoxLZ2_CheckedChanged"
+							ToolTip.Tip="Лемпель-Зив (LZ) - алгоритм словарного сжатия, кодирующий повторяющиеся группы бит (LZMA), символов или слов. На самом деле Лемпель и Зив - две разные фамилии. В сочетании с Хаффманом является классикой в деле сжатия данных."
+							IsChecked="True">
+							<TextBlock
+								Text="LZ" />
+						</CheckBox>
+						<CheckBox
+							x:Name="CheckBoxCOMB2"
+							IsCheckedChanged="CheckBoxCOMB2_CheckedChanged"
+							ToolTip.Tip="Комбинирование слов (CombineWords, COMB) - это метод сокращения количества слов в тексте, использующий тот факт, что алгоритм распаковки слов формален, и ему совершенно безразлично, работать с настоящими словами естественного языка или с чем угодно другим. Поэтому COMB объединяет группы из двух или трех часто используемых слов в одно мнимое слово, что может увеличить степень сжатия.">
+							<TextBlock
+								Text="COMB" />
+						</CheckBox>
+						<CheckBox
+							x:Name="CheckBoxFAB2"
+							IsCheckedChanged="CheckBoxFAB2_CheckedChanged"
+							ToolTip.Tip='Заполнить алфавит (Stretch Alphabet, FAB) - это метод, в чем-то похожий на COMB, но работающий с байтами. Он также стремится уменьшить количество байт, как COMB - слов, но так как длина байта фиксирована, и невозможно создать байт, напрямую содержащий то, что раньше было двумя или тремя байтами, то FAB заменяет блоки байт на байты, которых до этого не было во входном потоке, заполняя "алфавит" файла (под "алфавитом" следует понимать не алфавит какого-либо языка, а множество байт, содержащихся в файле (без повторений)) и "раскрывая" значение таких байт в начале файла.'>
+							<TextBlock
+								Text="FAB" />
+						</CheckBox>
+					</StackPanel>
+					<CheckBox
+						x:Name="CheckBoxCS3"
+						IsCheckedChanged="CheckBoxCS3_CheckedChanged"
+						Grid.Column="2">
+						<TextBlock
+							Text="C-S3" />
+					</CheckBox>
+					<StackPanel
+						Orientation="Vertical"
+						x:Name="PanelCS3"
+						Grid.Column="2"
+						Grid.Row="1"
+						IsEnabled="{Binding IsChecked, ElementName=CheckBoxCS3}">
+						<TextBlock
+							ToolTip.Tip='Хаффман (Huff, HF) - алгоритм энтропийного сжатия, кодирующий частые элементы короткими кодами, а редкие - длинными. Для HF без специальных обозначений "элементами" являются байты, благодаря чему он быстрый и универсальный, и вместе с Лемпелем-Зивом является классикой в деле сжатия данных, но сжимает часто хуже, чем более специфические алгоритмы.'
+							Text="  ✓     HF" />
+						<TextBlock
+							ToolTip.Tip='Преобразование Барроуза-Уилера (BWT) - это алгоритм, который не только не сжимает, а даже слегка "раздувает" входной поток, да еще и "перетрясает" все его байты в непредсказуемом порядке, но, как ни парадоксально, если результат сжать Хаффманом, можно добиться намного лучшей степени сжатия, чем если применять Хаффман к результату сжатия Лемпелем-Зивом (теоретически).'
+							Text="  ✓     BWT" />
+						<CheckBox
+							x:Name="CheckBoxAHF3"
+							IsCheckedChanged="CheckBoxAHF3_CheckedChanged"
+								ToolTip.Tip="Адаптивный Хаффман (AHF) - алгоритм энтропийного сжатия, похожий на Хаффман (HF), но способный динамически добавлять элементы в кодовую таблицу, начиная с первого, и учитывать их вероятность в текущем контексте, а не во всем файле. В результате этого сжатый текст (AB)¹⁰⁰⁰(CD)¹⁰⁰⁰(EF)¹⁰⁰⁰(GH)¹⁰⁰⁰ (показатель степени обозначает количество повторов) займет намного меньше, чем (8000 * log₂8) бит.">
+							<TextBlock
+									Text="AHF" />
+						</CheckBox>
+					</StackPanel>
+					<CheckBox
+						x:Name="CheckBoxCS4"
+						IsCheckedChanged="CheckBoxCS4_CheckedChanged"
+						Grid.Column="3">
+						<TextBlock
+							Text="C-S4" />
+					</CheckBox>
+					<StackPanel
+						Orientation="Vertical"
+						x:Name="PanelCS4"
+						Grid.Column="3"
+						Grid.Row="1"
+						IsEnabled="{Binding IsChecked, ElementName=CheckBoxCS4}">
+						<TextBlock
+							ToolTip.Tip="Хаффман для слов (HFW) - историческое название алгоритма энтропийного сжатия, сжимающего слова на естественном (русском, английском) языке. Историческим оно является потому, что 1 - это не Хаффман, а арифметическое кодирование, и 2 - оно ничем не отличается от такого же для байт, а собственно слова кодирует совсем другая функция, и между ними можно вставить что-то еще, например, Лемпель-Зив."
+							Text="  ✓     HFW" />
+						<TextBlock
+							ToolTip.Tip='Преобразование Барроуза-Уилера (BWT) - это алгоритм, который не только не сжимает, а даже слегка "раздувает" входной поток, да еще и "перетрясает" все его байты в непредсказуемом порядке, но, как ни парадоксально, если результат сжать Хаффманом, можно добиться намного лучшей степени сжатия, чем если применять Хаффман к результату сжатия Лемпелем-Зивом (теоретически).'
+							Text="  ✓     BWT" />
+						<CheckBox
+							x:Name="CheckBoxCOMB4"
+							IsCheckedChanged="CheckBoxCOMB4_CheckedChanged"
+							ToolTip.Tip="Комбинирование слов (CombineWords, COMB) - это метод сокращения количества слов в тексте, использующий тот факт, что алгоритм распаковки слов формален, и ему совершенно безразлично, работать с настоящими словами естественного языка или с чем угодно другим. Поэтому COMB объединяет группы из двух или трех часто используемых слов в одно мнимое слово, что может увеличить степень сжатия.">
+							<TextBlock
+								Text="COMB" />
+						</CheckBox>
+						<CheckBox
+							x:Name="CheckBoxFAB4"
+							IsCheckedChanged="CheckBoxFAB4_CheckedChanged"
+							ToolTip.Tip='Заполнить алфавит (Stretch Alphabet, FAB) - это метод, в чем-то похожий на COMB, но работающий с байтами. Он также стремится уменьшить количество байт, как COMB - слов, но так как длина байта фиксирована, и невозможно создать байт, напрямую содержащий то, что раньше было двумя или тремя байтами, то FAB заменяет блоки байт на байты, которых до этого не было во входном потоке, заполняя "алфавит" файла (под "алфавитом" следует понимать не алфавит какого-либо языка, а множество байт, содержащихся в файле (без повторений)) и "раскрывая" значение таких байт в начале файла.'>
+							<TextBlock
+								Text="FAB" />
+						</CheckBox>
+					</StackPanel>
+					<CheckBox
+						x:Name="CheckBoxCS5"
+						IsCheckedChanged="CheckBoxCS5_CheckedChanged"
+						Grid.Column="4">
+						<TextBlock
+							Text="C-S5" />
+					</CheckBox>
+					<StackPanel
+						Orientation="Vertical"
+						x:Name="PanelCS5"
+						Grid.Column="4"
+						Grid.Row="1"
+						IsEnabled="{Binding IsChecked, ElementName=CheckBoxCS5}">
+						<TextBlock
+							Background="#80BFFF"
+							ToolTip.Tip='LZMA - разновидность Лемпеля-Зива (LZ), применяемая к битам. Одно это уже делает алгоритм в корне отличающимся от "классического" Лемпеля-Зива и по степени сжатия, и по скорости, и по собственно алгоритму. Одно только название осталось от LZ...'
+							Text="  ✓     LZMA" />
+					</StackPanel>
+					<CheckBox
+						x:Name="CheckBoxCS6"
+						IsCheckedChanged="CheckBoxCS6_CheckedChanged"
+						Grid.Column="5">
+						<TextBlock
+							Text="C-S6" />
+					</CheckBox>
+					<StackPanel
+						Orientation="Vertical"
+						x:Name="PanelCS6"
+						Grid.Column="5"
+						Grid.Row="1"
+						IsEnabled="{Binding IsChecked, ElementName=CheckBoxCS6}">
+						<TextBlock
+							ToolTip.Tip='Предсказание по частичному совпадению (PPM) - алгоритм сжатия текста, обеспечивающий экстремальные степени сжатия, но потребляющий огромное количество (до нескольких тысяч раз от размера файла) оперативной памяти. Суть его заключается в особом энтропийном кодировании, кодирующем не только одиночные элементы, но и их сочетания. Например, Хаффман закодирует английское сочетание "qu" как отдельно "q" и отдельно "u", вероятность встретить которую примерно средняя среди всех букв - например, меньше, чем у "a" - а PPM закодирует эту "u" именно как следующую за "q", где ее вероятность примерно 99.9% (а мы знаем, что чем более вероятный какой-либо элемент, тем короче его энтропийный код).'
+							Text="  ✓     PPM" />
+					</StackPanel>
+					<CheckBox
+						x:Name="CheckBoxCS7"
+						IsCheckedChanged="CheckBoxCS7_CheckedChanged"
+						Grid.Column="6">
+						<TextBlock
+							Text="C-S7" />
+					</CheckBox>
+					<StackPanel
+						Orientation="Vertical"
+						x:Name="PanelCS7"
+						Grid.Column="6"
+						Grid.Row="1"
+						IsEnabled="{Binding IsChecked, ElementName=CheckBoxCS7}">
+						<TextBlock
+							ToolTip.Tip="PPM для слов (PPMW) - самый эффективный алгоритм сжатия текста из всех. Разбивает на слова, а потом сжимает методом предсказания по частичному совпадению (PPM). Ни один осмысленный текст на естественном языке не устоит перед его натиском!"
+							Text="  ✓     PPMW" />
+						<CheckBox
+							x:Name="CheckBoxCOMB7"
+							IsCheckedChanged="CheckBoxCOMB7_CheckedChanged"
+							ToolTip.Tip="Комбинирование слов (CombineWords, COMB) - это метод сокращения количества слов в тексте, использующий тот факт, что алгоритм распаковки слов формален, и ему совершенно безразлично, работать с настоящими словами естественного языка или с чем угодно другим. Поэтому COMB объединяет группы из двух или трех часто используемых слов в одно мнимое слово, что может увеличить степень сжатия.">
+							<TextBlock
+								Text="COMB" />
+						</CheckBox>
+						<CheckBox
+							x:Name="CheckBoxFAB7"
+							IsCheckedChanged="CheckBoxFAB7_CheckedChanged"
+							ToolTip.Tip='Заполнить алфавит (Stretch Alphabet, FAB) - это метод, в чем-то похожий на COMB, но работающий с байтами. Он также стремится уменьшить количество байт, как COMB - слов, но так как длина байта фиксирована, и невозможно создать байт, напрямую содержащий то, что раньше было двумя или тремя байтами, то FAB заменяет блоки байт на байты, которых до этого не было во входном потоке, заполняя "алфавит" файла (под "алфавитом" следует понимать не алфавит какого-либо языка, а множество байт, содержащихся в файле (без повторений)) и "раскрывая" значение таких байт в начале файла.'>
+							<TextBlock
+								Text="FAB" />
+						</CheckBox>
+					</StackPanel>
+					<CheckBox
+						x:Name="CheckBoxCS8"
+						IsCheckedChanged="CheckBoxCS8_CheckedChanged"
+						Grid.Column="7">
+						<TextBlock
+							Text="C-S8" />
+					</CheckBox>
+					<StackPanel
+						Orientation="Vertical"
+						x:Name="PanelCS8"
+						Grid.Column="7"
+						Grid.Row="1"
+						IsEnabled="{Binding IsChecked, ElementName=CheckBoxCS8}">
+						<TextBlock
+							Background="#80BFFF"
+							ToolTip.Tip='PPM для бит (PPMB) - поражающий воображение алгоритм сжатия - работает с произвольными данными, сжимает так, что все другие и рядом не стояли, практически моментально восстанавливается после "встряски" резкой сменой типа контента... если вы готовы к скорости меньше 1 МБ/ч и затратам RAM x5000 от размера файла (для сжатия 8 МБ ее потребуется 40 ГБ)!'
+							Text="  ✓     PPMB" />
+					</StackPanel>
+				</Grid>
+				<StackPanel
+					Orientation="Horizontal">
+					<TextBlock
+						Text="Размер фрагмента (млн.): " />
+					<ComboBox
+						x:Name="ComboFragmentLength"
+						SelectionChanged="ComboFragmentLength_SelectionChanged">
+						<ComboBox.Items>
+							<x:String>1</x:String>
+							<x:String>2</x:String>
+							<x:String>4</x:String>
+							<x:String>8</x:String>
+							<x:String>16</x:String>
+							<x:String>32</x:String>
+							<x:String>64</x:String>
+							<x:String>128</x:String>
+							<x:String>256</x:String>
+							<x:String>512</x:String>
+							<x:String>1024</x:String>
+							<x:String>2048</x:String>
+						</ComboBox.Items>
+						<ComboBox.SelectedIndex>4</ComboBox.SelectedIndex>
+					</ComboBox>
+				</StackPanel>
+			</StackPanel>
+			<!--</DataTemplate>
+					</TabItem.ContentTemplate>
+				</TabItem>
+				<TabItem x:Name="TabItemArchiving" Title="Архивация">
+					<TabItem.ContentTemplate>
+						<DataTemplate>
+							<Image
+								HorizontalAlignment="Left"
+								Source="under_development.png"
+								WidthRequest="256" />
+						</DataTemplate>
+					</TabItem.ContentTemplate>
+				</TabItem>
+			</TabView>-->
+		</StackPanel>
+	</ScrollViewer>
+</UserControl>

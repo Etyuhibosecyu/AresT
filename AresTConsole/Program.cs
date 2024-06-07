@@ -56,9 +56,9 @@ void ClientReceive(object? ID)
 	{
 		try
 		{
-			netStream[thisID].Read(receiveLen, 0, 4);
+			netStream[thisID].ReadExactly(receiveLen);
 			receive = new byte[BitConverter.ToInt32(receiveLen)];
-			netStream[thisID].Read(receive, 0, receive.Length);
+			netStream[thisID].ReadExactly(receive);
 			WorkUpReceiveMessage(receive);
 		}
 		catch
@@ -93,7 +93,7 @@ void ExecutorExited(object? sender, EventArgs? e)
 
 void StartExecutor()
 {
-	executor = ExecFunction.Start(AresTLib.MainClass.Main, new[] { port.ToString() });
+	executor = ExecFunction.Start(AresTLib.MainClass.Main, [port.ToString()]);
 	executor.EnableRaisingEvents = true;
 	executor.Exited += ExecutorExited;
 }

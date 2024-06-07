@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿
+using Mpir.NET;
 
 namespace AresTLib;
 
@@ -103,7 +104,7 @@ internal partial class Compression
 		BWTInternal();
 		byteInput.Clear();
 		for (var i = 0; i < byteResult.Length; i += BWTBlockSize)
-			byteInput.AddRange(byteResult.GetRange(i..(i += BWTBlockExtraSize))).AddRange(RLEAfterBWT(byteResult.Skip(i).Take(BWTBlockSize), byteInput.GetRange(^BWTBlockExtraSize..)));
+			byteInput.AddRange(byteResult.GetRange(i..(i += BWTBlockExtraSize))).AddRange(RLEAfterBWT(byteResult.Skip(i).Take(BWTBlockSize), byteInput.GetRange(^BWTBlockExtraSize..), uniqueElems2[0]));
 		uniqueElems2 = byteResult.Filter((x, index) => index % (BWTBlockSize + BWTBlockExtraSize) >= BWTBlockExtraSize).ToHashSet().ToNList().Sort();
 		result.AddRange(byteInput.Convert(x => new ShortIntervalList() { new(x, ValuesInByte) }));
 		result[0].Add(BWTApplied);
@@ -203,23 +204,23 @@ internal partial class Compression
 		}
 	}
 
-	private static Slice<byte> RLEAfterBWT(Slice<byte> input, NList<byte> firstPermutationRange)
+	private static Slice<byte> RLEAfterBWT(Slice<byte> input, NList<byte> firstPermutationRange, byte zero)
 	{
-		var result = new NList<byte>(input.Length);
+		var result = new NList<byte>(input.Length + 1) { zero };
 		for (var i = 0; i < input.Length;)
 		{
 			result.Add(input[i++]);
 			if (i == input.Length)
 				break;
 			var j = i;
-			while (i < input.Length && i - j < ValuesIn2Bytes && input[i] != 0)
+			while (i < input.Length && i - j < ValuesIn2Bytes && input[i] != zero)
 				i++;
 			if (i != j)
 				result.AddRange(i - j < ValuesInByte >> 1 ? [(byte)(i - j - 1 + (ValuesInByte >> 1))] : [(byte)(ValuesInByte - 1), (byte)((i - j - (ValuesInByte >> 1)) >> BitsPerByte), (byte)(i - j - (ValuesInByte >> 1))]).AddRange(input.GetSlice(j..i));
 			if (i - j >= ValuesIn2Bytes)
 				continue;
 			j = i;
-			while (i < input.Length && i - j < ValuesIn2Bytes && input[i] == 0)
+			while (i < input.Length && i - j < ValuesIn2Bytes && input[i] == zero)
 				i++;
 			if (i != j)
 				result.AddRange(i - j < ValuesInByte >> 1 ? [(byte)(i - j - 1)] : [(byte)((ValuesInByte >> 1) - 1), (byte)((i - j - (ValuesInByte >> 1)) >> BitsPerByte), (byte)(i - j - (ValuesInByte >> 1))]);
@@ -238,7 +239,38 @@ internal partial class Compression
 		if (input2.Length != decoded.Length)
 			throw new DecoderFallbackException();
 #endif
-		if (result.Length < input.Length)
+		if (result.Length < input.Length * 0.936)
+			return result.GetSlice();
+		else
+		{
+			firstPermutationRange[0] |= ValuesInByte >> 1;
+			return input;
+		}
+	}
+
+	private static Slice<byte> ZLE(Slice<byte> input, NList<byte> firstPermutationRange, byte zero)
+	{
+		var frequency = new int[ValuesInByte];
+		for (var i = 0; i < input.Length; i++)
+			frequency[input[i]]++;
+		var zeroB = Array.IndexOf(frequency, 0);
+		if (zeroB == -1)
+			return input;
+		var result = new NList<byte>(input.Length + 2) { zero, (byte)zeroB };
+		for (var i = 0; i < input.Length;)
+		{
+			while (i < input.Length && input[i] != zero)
+				result.Add(input[i++]);
+			if (i >= input.Length)
+				break;
+			var j = i;
+			while (i < input.Length && i - j < ValuesIn2Bytes && input[i] == zero)
+				i++;
+			if (i == j)
+				throw new EncoderFallbackException();
+			result.AddRange(((MpzT)(i - j + 1)).ToString(2)?.Skip(1).ToArray(x => (byte)(x == '1' ? zeroB : x == '0' ? zero : throw new EncoderFallbackException())));
+		}
+		if (result.Length < input.Length * 0.936)
 			return result.GetSlice();
 		else
 		{
