@@ -104,7 +104,7 @@ internal partial class Compression
 		BWTInternal();
 		byteInput.Clear();
 		for (var i = 0; i < byteResult.Length; i += BWTBlockSize)
-			byteInput.AddRange(byteResult.GetRange(i..(i += BWTBlockExtraSize))).AddRange(RLEAfterBWT(byteResult.Skip(i).Take(BWTBlockSize), byteInput.GetRange(^BWTBlockExtraSize..), uniqueElems2[0]));
+			byteInput.AddRange(byteResult.GetRange(i..(i += BWTBlockExtraSize))).AddRange(ZLE(byteResult.Skip(i).Take(BWTBlockSize), byteInput.GetRange(^BWTBlockExtraSize..), uniqueElems2[0]));
 		uniqueElems2 = byteResult.Filter((x, index) => index % (BWTBlockSize + BWTBlockExtraSize) >= BWTBlockExtraSize).ToHashSet().ToNList().Sort();
 		result.AddRange(byteInput.Convert(x => new ShortIntervalList() { new(x, ValuesInByte) }));
 		result[0].Add(BWTApplied);
@@ -201,50 +201,6 @@ internal partial class Compression
 					Status[tn]++;
 				}
 			}
-		}
-	}
-
-	private static Slice<byte> RLEAfterBWT(Slice<byte> input, NList<byte> firstPermutationRange, byte zero)
-	{
-		var result = new NList<byte>(input.Length + 1) { zero };
-		for (var i = 0; i < input.Length;)
-		{
-			result.Add(input[i++]);
-			if (i == input.Length)
-				break;
-			var j = i;
-			while (i < input.Length && i - j < ValuesIn2Bytes && input[i] != zero)
-				i++;
-			if (i != j)
-				result.AddRange(i - j < ValuesInByte >> 1 ? [(byte)(i - j - 1 + (ValuesInByte >> 1))] : [(byte)(ValuesInByte - 1), (byte)((i - j - (ValuesInByte >> 1)) >> BitsPerByte), (byte)(i - j - (ValuesInByte >> 1))]).AddRange(input.GetSlice(j..i));
-			if (i - j >= ValuesIn2Bytes)
-				continue;
-			j = i;
-			while (i < input.Length && i - j < ValuesIn2Bytes && input[i] == zero)
-				i++;
-			if (i != j)
-				result.AddRange(i - j < ValuesInByte >> 1 ? [(byte)(i - j - 1)] : [(byte)((ValuesInByte >> 1) - 1), (byte)((i - j - (ValuesInByte >> 1)) >> BitsPerByte), (byte)(i - j - (ValuesInByte >> 1))]);
-		}
-#if DEBUG
-		var input2 = input;
-		var pos = 0;
-		var decoded = new Decoding().DecodeRLEAfterBWT(result, ref pos);
-		for (var i = 0; i < input2.Length && i < decoded.Length; i++)
-		{
-			var x = input2[i];
-			var y = decoded[i];
-			if (x != y)
-				throw new DecoderFallbackException();
-		}
-		if (input2.Length != decoded.Length)
-			throw new DecoderFallbackException();
-#endif
-		if (result.Length < input.Length * 0.936)
-			return result.GetSlice();
-		else
-		{
-			firstPermutationRange[0] |= ValuesInByte >> 1;
-			return input;
 		}
 	}
 

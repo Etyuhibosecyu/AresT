@@ -17,6 +17,7 @@ global using ArithmeticDecoder = AresGlobalMethods005.ArithmeticDecoder;
 global using HuffmanData = AresGlobalMethods005.HuffmanData;
 global using LZData = AresGlobalMethods005.LZData;
 using System.Text.RegularExpressions;
+using Mpir.NET;
 
 namespace AresTLib;
 
@@ -205,7 +206,7 @@ public class Decoding : AresTLib007.Decoding
 		{
 			var rle = bytes[i] & ValuesInByte >> 1;
 			bytes2.AddRange(bytes.GetSlice(i..(i += BWTBlockExtraSize)));
-			bytes2.AddRange(rle == 0 ? DecodeRLEAfterBWT(bytes, ref i) : bytes.GetRange(i..Min(i += BWTBlockSize, bytes.Length)));
+			bytes2.AddRange(rle == 0 ? DecodeZLE(bytes, ref i) : bytes.GetRange(i..Min(i += BWTBlockSize, bytes.Length)));
 		}
 		var hs = bytes2.Filter((x, index) => index % (BWTBlockSize + BWTBlockExtraSize) >= BWTBlockExtraSize).ToHashSet().Concat(skipped).Sort().ToHashSet();
 		List<ShortIntervalList> result = new(bytes2.Length);
@@ -244,62 +245,28 @@ public class Decoding : AresTLib007.Decoding
 		return result;
 	}
 
-	public override NList<byte> DecodeRLEAfterBWT(NList<byte> byteList, ref int i)
+	public virtual NList<byte> DecodeZLE(NList<byte> byteList, ref int i)
 	{
 		if (i >= byteList.Length)
 			throw new DecoderFallbackException();
-		var zero = byteList[i++];
+		byte zero = byteList[i++], zeroB = byteList[i++];
 		NList<byte> result = [];
-		int length, serie, l;
-		byte temp;
+		String zeroCode = ['1'];
+		int length;
 		for (; i < byteList.Length && result.Length < BWTBlockSize;)
 		{
-			result.Add(byteList[i++]);
+			while (i < byteList.Length && result.Length < BWTBlockSize && byteList[i] != zero && byteList[i] != zeroB)
+				result.Add(byteList[i++]);
 			if (i >= byteList.Length || result.Length >= BWTBlockSize)
 				break;
-			temp = byteList[i++];
-			if (temp >= ValuesInByte >> 1)
-				serie = 2;
-			else
-				serie = 1;
-			if (temp % (ValuesInByte >> 1) != (ValuesInByte >> 1) - 1)
-				length = temp % (ValuesInByte >> 1) + 1;
-			else
+			zeroCode.Remove(1);
+			length = 0;
+			while (i < byteList.Length && result.Length + length < BWTBlockSize && (byteList[i] == zero || byteList[i] == zeroB))
 			{
-				if (i >= byteList.Length - 1 || result.Length >= BWTBlockSize - 1)
-					break;
-				length = (byteList[i++] << BitsPerByte) + byteList[i++] + (ValuesInByte >> 1);
+				zeroCode.Add(byteList[i++] == zero ? '0' : '1');
+				length = (int)(new MpzT(zeroCode.ToString(), 2) - 1);
 			}
-			if (result.Length + length > BWTBlockSize)
-				throw new DecoderFallbackException();
-			if (serie == 1)
-			{
-				for (var j = 0; j < length; j++)
-					result.Add(zero);
-				continue;
-			}
-			l = Min(length, byteList.Length - i);
-			result.AddRange(byteList.GetRange(i, l));
-			i += l;
-			if (l >= ValuesIn2Bytes)
-				continue;
-			if (i >= byteList.Length || result.Length >= BWTBlockSize)
-				break;
-			temp = byteList[i++];
-			if (temp >= ValuesInByte >> 1)
-				throw new DecoderFallbackException();
-			if (temp % (ValuesInByte >> 1) != (ValuesInByte >> 1) - 1)
-				length = temp % (ValuesInByte >> 1) + 1;
-			else
-			{
-				if (i >= byteList.Length - 1 || result.Length >= BWTBlockSize - 1)
-					break;
-				length = (byteList[i++] << BitsPerByte) + byteList[i++] + (ValuesInByte >> 1);
-			}
-			if (result.Length + length > BWTBlockSize)
-				throw new DecoderFallbackException();
-			for (var j = 0; j < length; j++)
-				result.Add(zero);
+			result.AddRange(RedStarLinq.NFill(zero, length));
 		}
 		return result;
 	}
