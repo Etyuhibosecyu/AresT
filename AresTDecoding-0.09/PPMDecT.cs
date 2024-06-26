@@ -1,7 +1,7 @@
 ﻿
-namespace AresTLib005;
+namespace AresTLib;
 
-public class PPMDec
+public class PPMDecT
 {
 	protected ArithmeticDecoder ar = default!;
 	protected uint inputBase, dicsize;
@@ -17,11 +17,13 @@ public class PPMDec
 	protected FastDelHashSet<NList<uint>> contextHS = default!;
 	protected List<SumSet<uint>> sumSets = default!;
 	protected NList<uint> preLZMap = default!, spacesMap = default!;
-	protected Decoding decoding = default!;
+	protected SumList lzLengthsSL = default!;
+	protected SumSet<uint> lzPositions = [(uint.MaxValue, 100)];
+	protected DecodingT decoding = default!;
 
-	protected PPMDec() { }
+	protected PPMDecT() { }
 
-	public PPMDec(Decoding decoding, ArithmeticDecoder ar, uint inputBase, int n = -1)
+	public PPMDecT(DecodingT decoding, ArithmeticDecoder ar, uint inputBase, int n = -1)
 	{
 		this.decoding = decoding;
 		this.ar = ar;
@@ -32,6 +34,8 @@ public class PPMDec
 
 	protected virtual void Initialize()
 	{
+		if (n == -1)
+			decoding.GetRepeatsCount();
 		counter = ar.ReadCount();
 		dicsize = ar.ReadCount();
 		if (counter > decoding.GetFragmentLength() || dicsize > decoding.GetFragmentLength())
@@ -46,12 +50,13 @@ public class PPMDec
 		globalSet = [];
 		newItemsSet = n == 2 ? new() : new(new Chain((int)inputBase).Convert(x => ((uint)x, 1)));
 		maxDepth = 12;
-		var comparer = n == 2 ? (G.IEqualityComparer<NList<uint>>)new NListEComparer<uint>() : new EComparer<NList<uint>>((x, y) => x.Equals(y), x => (int)x.Progression((uint)x.Length, (x, y) => (x << 7 | x >> BitsPerInt - 7) ^ (uint)y.GetHashCode()));
+		var comparer = n == 2 ? (G.IEqualityComparer<NList<uint>>)new NListEComparer<uint>() : new EComparer<NList<uint>>((x, y) => x.Equals(y), x => unchecked(x.Progression(17 * 23 + x.Length, (x, y) => x * 23 + y.GetHashCode())));
 		contextHS = new(comparer);
 		sumSets = [];
 		preLZMap = new(2, 1, 2);
 		spacesMap = new(2, 1, 2);
 		nextWordLink = 0;
+		lzLengthsSL = [1];
 	}
 
 	public virtual List<ShortIntervalList> Decode()
@@ -124,7 +129,7 @@ public class PPMDec
 		for (var i = 0; i < length + maxDepth - 1; i++)
 		{
 			result.Add(result[oldPos + i]);
-			Increase(result.GetSlice(result.Length - maxDepth - 1, maxDepth).NConvert(x => x[0].Lower).Reverse(), context, result[^1][0].Lower);
+			Increase(result.GetSlice(result.Length - maxDepth - 1, maxDepth).ToNList(x => x[0].Lower).Reverse(), context, result[^1][0].Lower);
 		}
 		preLZMap[1]++;
 		var decrease = length + maxDepth - 2;
@@ -134,13 +139,33 @@ public class PPMDec
 
 	protected virtual int ProcessLZDist()
 	{
-		var dist = ar.ReadEqual(Min((uint)result.Length, dicsize - 1));
-		return (int)(result.Length - dist - 2);
+		var index = ar.ReadPart(lzPositions);
+		var pos = lzPositions[index];
+		lzPositions.Update(pos.Key, pos.Value + 100);
+		if (index == lzPositions.Length - 1)
+		{
+			pos = (ar.ReadEqual(Min((uint)result.Length, dicsize - 1)), 100);
+			lzPositions.Add(pos);
+		}
+		return (int)pos.Key;
 	}
 
 	protected virtual uint ProcessLZLength()
 	{
-		if (!ar.ReadFibonacci(out var length) || length + maxDepth - 1 > counter)
+		var readIndex = ar.ReadPart(lzLengthsSL);
+		uint length;
+		if (readIndex < lzLengthsSL.Length - 1)
+		{
+			length = (uint)readIndex + 1;
+			lzLengthsSL.Increase(readIndex);
+		}
+		else if (ar.ReadFibonacci(out length) && length + maxDepth - 1 <= counter)
+		{
+			length += (uint)lzLengthsSL.Length - 1;
+			lzLengthsSL.Increase(lzLengthsSL.Length - 1);
+			new Chain((int)length - lzLengthsSL.Length).ForEach(x => lzLengthsSL.Insert(lzLengthsSL.Length - 1, 1));
+		}
+		else
 			throw new DecoderFallbackException();
 		return length;
 	}

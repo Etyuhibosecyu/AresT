@@ -3,9 +3,10 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
   </PropertyGroup>
 
-  <ItemGroup>
+	<ItemGroup>
     <ProjectReference Include="..\..\AresGlobal\AresGlobalMethods\AresGlobalMethods.csproj" />
     <ProjectReference Include="..\AresTDecoding-0.09\AresTDecoding-0.09.csproj" />
     <Compile Update="Properties\Resources.Designer.cs">

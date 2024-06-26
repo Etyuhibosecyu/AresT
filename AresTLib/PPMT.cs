@@ -133,7 +133,7 @@ file record class PPMInternal(List<ShortIntervalList> Input, List<Interval> Resu
 		else
 			newItemsSet.Replace(new Chain((int)inputBase).Convert(x => ((uint)x, 1)));
 		buffer.Clear();
-		comparer = N == 2 ? new NListEComparer<uint>() : new EComparer<NList<uint>>((x, y) => x.Equals(y), x => (int)x.Progression((uint)x.Length, (x, y) => (x << 7 | x >> BitsPerInt - 7) ^ (uint)y.GetHashCode()));
+		comparer = N == 2 ? new NListEComparer<uint>() : new EComparer<NList<uint>>((x, y) => x.Equals(y), x => unchecked(x.Progression(17 * 23 + x.Length, (x, y) => x * 23 + y.GetHashCode())));
 		contextHS = new(comparer);
 		lzhl = [];
 		sumSets.Clear();
@@ -317,102 +317,5 @@ file record class PPMInternal(List<ShortIntervalList> Input, List<Interval> Resu
 			globalSet.Update(item, globalValue + (int)Max(Round((double)100 / (successLength + 1)), 1));
 		else
 			globalSet.Add(item, 100);
-	}
-}
-
-internal record class PPMBits(int TN)
-{
-	private const int LZDictionarySize = 8388607;
-
-	public byte[] Encode(BitList input)
-	{
-		Status[TN] = 0;
-		StatusMaximum[TN] = input.Length;
-		using ArithmeticEncoder ar = new();
-		ar.WriteCount((uint)input.Length);
-		var dicsize = LZDictionarySize << 3;
-		ar.WriteCount((uint)dicsize);
-		(uint Zeros, uint Units) globalSet = (1, 1);
-		var maxDepth = 96;
-		LimitedQueue<List<Interval>> buffer = new(maxDepth);
-		var comparer = new EComparer<BitList>((x, y) => x.Equals(y), x => (int)x.Progression((uint)x.Length, (x, y) => (x << 7 | x >> BitsPerInt - 7) ^ (uint)y.GetHashCode()));
-		FastDelHashSet<BitList> contextHS = new(comparer);
-		HashList<BitList> lzhl = new(comparer);
-		List<(uint Zeros, uint Units)> sumSets = [];
-		uint lzCount = 1, notLZCount = 1;
-		var nextTarget = 0;
-		for (var i = 0; i < input.Length; i++, Status[TN]++)
-		{
-			var item = input[i];
-			var context = input.GetRange(Max(0, i - maxDepth)..i).Reverse();
-			var context2 = context.Copy();
-			if (i < nextTarget)
-				goto l1;
-			var index = -1;
-			List<Interval> intervals = [];
-			if (context.Length == maxDepth && i >= maxDepth << 1 && ProcessLZ(context, item, i) && i < nextTarget)
-				goto l1;
-			for (; context.Length > 0 && !contextHS.TryGetIndexOf(context, out index); context.RemoveAt(^1)) ;
-			if (context.Length == 0)
-				intervals.Add(new(item ? globalSet.Zeros : 0, item ? globalSet.Units : globalSet.Zeros, globalSet.Zeros + globalSet.Units));
-			else
-				intervals.Add(new(item ? sumSets[index].Zeros : 0, item ? sumSets[index].Units : sumSets[index].Zeros, sumSets[index].Zeros + sumSets[index].Units));
-			if (buffer.IsFull)
-				buffer.Dequeue().ForEach(x => ar.WritePart(x.Lower, x.Length, x.Base));
-			buffer.Enqueue(intervals);
-		l1:
-			if (context2.Length == maxDepth)
-				lzhl.SetOrAdd((i - maxDepth) % dicsize, context2.Copy());
-			Increase(context2, item);
-			context.Dispose();
-			context2.Dispose();
-		}
-		while (buffer.Length != 0)
-			buffer.Dequeue().ForEach(x => ar.WritePart(x.Lower, x.Length, x.Base));
-		bool ProcessLZ(BitList context, bool item, int i)
-		{
-			if (!buffer.IsFull)
-				return false;
-			var bestDist = -1;
-			var bestLength = -1;
-			foreach (var pos in lzhl.IndexesOf(context))
-			{
-				var dist = (pos - (i - maxDepth)) % dicsize + i - maxDepth;
-				int length;
-				for (length = -maxDepth; length < input.Length - i && input[i + length] == input[dist + maxDepth + length]; length++) ;
-				if (i - (dist + maxDepth) >= 2 && length > bestLength)
-				{
-					bestDist = dist;
-					bestLength = length;
-				}
-			}
-			if (bestDist == -1)
-			{
-				if (buffer.IsFull)
-				{
-					ar.WritePart(0, notLZCount, lzCount + notLZCount);
-					notLZCount++;
-				}
-				return false;
-			}
-			ar.WritePart(notLZCount, lzCount, lzCount + notLZCount);
-			lzCount++;
-			ar.WriteEqual((uint)(i - (bestDist + maxDepth) - 2), (uint)Min(i - maxDepth, dicsize - 1));
-			ar.WriteFibonacci((uint)bestLength + 1);
-			buffer.Clear();
-			nextTarget = i + bestLength;
-			return true;
-		}
-		void Increase(BitList context, bool item)
-		{
-			for (; context.Length > 0 && !contextHS.TryGetIndexOf(context, out var index); context.RemoveAt(^1))
-			{
-				contextHS.TryAdd(context.Copy(), out index);
-				sumSets.SetOrAdd(index, item ? (1, (uint)(GetArrayLength(context.Length, 2) + 1)) : ((uint)(GetArrayLength(context.Length, 2) + 1), 1));
-			}
-			for (; context.Length > 0 && contextHS.TryGetIndexOf(context, out var index); sumSets[index] = (Clamp(sumSets[index].Zeros + (item ? 0xffffffff : 1), 1, 40), Clamp(sumSets[index].Units + (item ? 1 : 0xffffffff), 1, 40)), context.RemoveAt(^1)) ;
-			globalSet = (globalSet.Zeros + (item ? 0u : 1), globalSet.Units + (item ? 1u : 0));
-		}
-		return ar;
 	}
 }

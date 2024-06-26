@@ -456,7 +456,6 @@ $RECYCLE.BIN/
 
 *.txt
 *.ares-t
-*.editorconfig
 /AresT.iss
 *.exe
 *.bat

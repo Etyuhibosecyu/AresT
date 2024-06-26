@@ -3,7 +3,7 @@ using System.Net.Sockets;
 
 namespace AresTLib;
 
-public static class MainClass
+public static class MainClassT
 {
 	private static TcpClient? client;
 	private static NetworkStream? netStream;
@@ -21,7 +21,9 @@ public static class MainClass
 	{
 #if !RELEASE
 		args = ["11000"];
-		Thread.Sleep(MillisecondsPerSecond * 2);
+		Thread.Sleep(MillisecondsPerSecond * 3);
+#else
+		Thread.Sleep(MillisecondsPerSecond);
 #endif
 		if (!(args.Length != 0 && int.TryParse(args[0], out var port) && port >= 1024 && port <= 65535))
 			return;
@@ -43,7 +45,7 @@ public static class MainClass
 		{
 			client.Connect(ipe);
 			netStream = client.GetStream();
-			Thread receiveThread = new(ReceiveData) { Name = "Подключение" };//получение данных
+			Thread receiveThread = new(ReceiveData) { IsBackground = true, Name = "Подключение-T" };//получение данных
 			receiveThread.Start();//старт потока
 		}
 		catch
@@ -64,8 +66,8 @@ public static class MainClass
 			else if (toSend.Length != 0)
 			{
 				var toSendLen = BitConverter.GetBytes(toSend.Length);
-				netStream.Write(toSendLen, 0, toSendLen.Length);
-				netStream.Write(toSend, 0, toSend.Length);
+				netStream.Write(toSendLen);
+				netStream.Write(toSend);
 				netStream.Flush(); //удаление данных из потока
 				toSend = [];
 			}
@@ -106,7 +108,7 @@ public static class MainClass
 		try
 		{
 			if (message[0] == 0)
-				PresentMethods = (UsedMethods)BitConverter.ToInt32(message.AsSpan(1..));
+				PresentMethodsT = (UsedMethodsT)BitConverter.ToInt32(message.AsSpan(1..));
 			else if (message[0] == 1)
 			{
 				FragmentLength = 1000000 << Min(BitConverter.ToInt32(message.AsSpan(1..)) & 0xF, 11);
@@ -122,12 +124,10 @@ public static class MainClass
 					3 => () => MainThread(filename, filename, Recompress),
 					_ => throw new NotImplementedException(),
 				})
-				{ Name = "Основной процесс" };
+				{ IsBackground = true, Name = "Основной процесс" };
 				thread.Start();
-				thread.IsBackground = true;
-				Thread thread2 = new(TransferProgress) { Name = "Передача прогресса" };
+				Thread thread2 = new(TransferProgress) { IsBackground = true, Name = "Передача прогресса" };
 				thread2.Start();
-				thread2.IsBackground = true;
 			}
 		}
 		catch
@@ -290,7 +290,7 @@ public static class MainClass
 			rfs.ReadExactly(bytes);
 			var s = new Executions(bytes).Encode();
 			if (fragmentCount != 1)
-				wfs.Write([(byte)(s.Length >> (BitsPerByte << 1)), (byte)(s.Length >> BitsPerByte), (byte)s.Length], 0, 3);
+				wfs.Write([(byte)(s.Length >> (BitsPerByte << 1)), unchecked((byte)(s.Length >> BitsPerByte)), unchecked((byte)s.Length)], 0, 3);
 			wfs.Write(s, 0, s.Length);
 			Supertotal += ProgressBarStep;
 			GC.Collect();
@@ -360,7 +360,7 @@ public static class MainClass
 				bytes = new byte[fragmentLength];
 				rfs.ReadExactly(bytes);
 			}
-			var s = new Decoding().Decode(bytes, encodingVersion);
+			var s = new DecodingT().Decode(bytes, encodingVersion);
 			wfs.Write(s, 0, s.Length);
 			Supertotal += ProgressBarStep;
 			GC.Collect();
@@ -376,7 +376,9 @@ public static class MainClass
 		var encodingVersion = (byte)(readByte & 63);
 		if (encodingVersion >= ProgramVersion)
 			wfs.WriteByte(readByte);
+#pragma warning disable CS8794 // Входные данные всегда соответствуют предоставленному шаблону.
 		if (encodingVersion is 0 or >= ProgramVersion)
+#pragma warning restore CS8794 // Входные данные всегда соответствуют предоставленному шаблону.
 		{
 			var bytes2 = rfs.Length < 2048000000 ? default! : new byte[2048000000];
 			for (var i = 1; i < rfs.Length; i += 2048000000)
@@ -417,9 +419,9 @@ public static class MainClass
 				bytes = new byte[fragmentLength];
 				rfs.ReadExactly(bytes);
 			}
-			var s = new Executions(new Decoding().Decode(bytes, encodingVersion)).Encode();
+			var s = new Executions(new DecodingT().Decode(bytes, encodingVersion)).Encode();
 			if (fragmentCount != 1)
-				wfs.Write([(byte)(s.Length >> (BitsPerByte << 1)), (byte)(s.Length >> BitsPerByte), (byte)s.Length], 0, 3);
+				wfs.Write([(byte)(s.Length >> (BitsPerByte << 1)), unchecked((byte)(s.Length >> BitsPerByte)), unchecked((byte)s.Length)], 0, 3);
 			wfs.Write(s, 0, s.Length);
 			Supertotal += ProgressBarStep;
 			GC.Collect();

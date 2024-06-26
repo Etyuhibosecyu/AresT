@@ -52,8 +52,8 @@ internal record class AdaptiveHuffman(int TN)
 		StatusMaximum[TN] = input.Length - startPos;
 		Current[TN] += ProgressBarStep;
 		set.Clear();
-		lengthsSL.Replace(lz ? RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2)) : []);
-		distsSL.Replace(lz ? RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1) : []);
+		lengthsSL.Replace(lz ? RedStarLinq.NFill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2)) : []);
+		distsSL.Replace(lz ? RedStarLinq.NFill(1, (int)lzData.UseSpiralLengths + 1) : []);
 		firstIntervalDist = lz ? (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
 		if (lz)
 			set.Add((newBase - 1, 1));
@@ -88,7 +88,7 @@ internal record class AdaptiveHuffman(int TN)
 file sealed record class AdaptiveHuffmanMain(ArithmeticEncoder Ar, List<ShortIntervalList> Input, LZData LZData, int N, int StartPos, bool LZ, uint NewBase, SumSet<uint> Set, SumList LengthsSL, SumList DistsSL, uint FirstIntervalDist, int TN)
 {
 	private int frequency, fullLength;
-	private uint lzLength, lzDist, lzSpiralLength, bufferInterval;
+	private uint lzLength, lzDist, lzSpiralLength, maxDist, bufferInterval;
 	private long sum;
 	private uint item;
 
@@ -132,6 +132,7 @@ file sealed record class AdaptiveHuffmanMain(ArithmeticEncoder Ar, List<ShortInt
 				lzLength = LZData.Length.R == 2 ? Input[i][j].Lower : Input[i][j].Lower + LZData.Length.Threshold + 1;
 				j++;
 			}
+			maxDist = Min(LZData.Dist.Max, (uint)(fullLength - LZData.UseSpiralLengths - lzLength - StartPos));
 			EncodeDist(i, ref j);
 			lzSpiralLength = LZData.UseSpiralLengths != 0 && Input[i][j - 1].Lower == Input[i][j - 1].Base - 1 ? LZData.SpiralLength.R == 0 ? Input[i][^1].Lower : (Input[i][^1].Lower + (LZData.SpiralLength.R == 1 ? LZData.SpiralLength.Threshold + 2 - LZData.SpiralLength.R : 0)) : 0;
 			var fullLengthDelta = (lzLength + 2) * (lzSpiralLength + 1);
@@ -152,12 +153,12 @@ file sealed record class AdaptiveHuffmanMain(ArithmeticEncoder Ar, List<ShortInt
 	private void EncodeDist(int i, ref int j)
 	{
 		item = Input[i][j].Lower;
-		var addThreshold = fullLength - LZData.UseSpiralLengths - lzLength - StartPos >= LZData.Dist.Threshold;
+		var addThreshold = maxDist >= LZData.Dist.Threshold;
 		lzDist = item + (LZData.Dist.R == 2 && addThreshold ? LZData.Dist.Threshold : 0);
-		if (LZData.Dist.R == 2 && addThreshold && lzDist == (DistsSL.Length == FirstIntervalDist ? LZData.Dist.Max : fullLength - LZData.UseSpiralLengths - lzLength - StartPos) + 1)
+		if (LZData.Dist.R == 2 && addThreshold && lzDist == maxDist + 1)
 		{
 			j++;
-			lzDist = LZData.UseSpiralLengths == 1 && Input[i][j].Lower == LZData.Dist.Threshold ? LZData.Dist.Max + 1 : Input[i][j].Lower;
+			lzDist = LZData.UseSpiralLengths == 1 && Input[i][j].Lower == LZData.Dist.Threshold ? maxDist + 1 : Input[i][j].Lower;
 		}
 		sum = DistsSL.GetLeftValuesSum((int)lzDist, out frequency);
 		Ar.WritePart((uint)sum, (uint)frequency, (uint)DistsSL.ValuesSum);

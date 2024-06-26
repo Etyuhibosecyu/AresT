@@ -1,9 +1,9 @@
 ﻿
-namespace AresTLib005;
+namespace AresTLib;
 
-public class AdaptiveHuffmanDec
+public class AdaptiveHuffmanDecT
 {
-	private readonly Decoding decoding = default!;
+	private readonly DecodingT decoding = default!;
 	protected ArithmeticDecoder ar = default!;
 	protected List<ShortIntervalList> result = default!;
 	protected NList<byte> skipped = default!;
@@ -12,11 +12,11 @@ public class AdaptiveHuffmanDec
 	protected LZData lzData = default!;
 	protected uint fileBase, nextWordLink;
 	protected int lz, bwt, n, fullLength, counter;
-	protected bool hfw;
+	protected SumList lengthsSL, distsSL;
+	protected int lzLength;
+	protected uint firstIntervalDist;
 
-	protected AdaptiveHuffmanDec() { }
-
-	public AdaptiveHuffmanDec(Decoding decoding, ArithmeticDecoder ar, NList<byte> skipped, LZData lzData, int lz, int bwt, int n, int counter, bool hfw)
+	public AdaptiveHuffmanDecT(DecodingT decoding, ArithmeticDecoder ar, NList<byte> skipped, LZData lzData, int lz, int bwt, int n, int counter)
 	{
 		this.decoding = decoding;
 		this.ar = ar;
@@ -26,8 +26,10 @@ public class AdaptiveHuffmanDec
 		this.bwt = bwt;
 		this.n = n;
 		this.counter = counter;
-		this.hfw = hfw;
 		Prerequisites();
+		lengthsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2))) : new();
+		distsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)lzData.UseSpiralLengths + 1)) : new();
+		firstIntervalDist = lz != 0 ? (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
 	}
 
 	public virtual List<ShortIntervalList> Decode()
@@ -41,7 +43,7 @@ public class AdaptiveHuffmanDec
 
 	protected virtual void Prerequisites()
 	{
-		if (bwt != 0 && !(hfw && n != 1))
+		if (bwt != 0 && n == 1)
 		{
 			var skippedCount = (int)ar.ReadCount();
 			var @base = skippedCount == 0 ? 1 : ar.ReadCount();
@@ -76,16 +78,23 @@ public class AdaptiveHuffmanDec
 		if (!(lz != 0 && uniqueList[readIndex].Lower == fileBase - 1))
 		{
 			result.Add(n == 2 ? new() { uniqueList[readIndex], new(ar.ReadEqual(2), 2) } : new() { uniqueList[readIndex] });
-			fullLength++;
+			lzLength++;
+			if (lz != 0 && distsSL.Length < firstIntervalDist)
+				distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1);
 			return;
 		}
-		result.Add([uniqueList[^1]]);
-		decoding.ProcessLZLength(lzData, out var length);
-		result[^1].Add(new(length, lzData.Length.Max + 1));
-		if (length > result.Length - 2)
+		decoding.ProcessLZLength(lzData, lengthsSL, out readIndex, out var length);
+		decoding.ProcessLZDist(lzData, distsSL, result.Length, out readIndex, out var dist, length, out var maxDist);
+		if (decoding.ProcessLZSpiralLength(lzData, ref dist, out var spiralLength, maxDist))
+			dist = 0;
+		var start = (int)(result.Length - dist - length - 2);
+		if (start < 0)
 			throw new DecoderFallbackException();
-		decoding.ProcessLZDist(lzData, fullLength, out var dist, length, out var maxDist);
-		ProcessDist(dist, length, out _, maxDist);
+		for (var k = (int)((length + 2) * (spiralLength + 1)); k > 0; k -= (int)length + 2)
+			result.AddRange(result.GetSlice(start, (int)Min(length + 2, k)));
+		lzLength++;
+		if (lz != 0 && distsSL.Length < firstIntervalDist)
+			new Chain((int)Min(firstIntervalDist - distsSL.Length, (length + 2) * (spiralLength + 1))).ForEach(x => distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1));
 	}
 
 	protected virtual int ReadFirst()
@@ -104,15 +113,7 @@ public class AdaptiveHuffmanDec
 		return readIndex;
 	}
 
-	protected virtual void FirstUpdateSet() => set.Update(uint.MaxValue, (int)GetBufferInterval((uint)set.GetLeftValuesSum(uint.MaxValue, out _)));
+	protected virtual void FirstUpdateSet() => set.Update(uint.MaxValue, Max(set.Length - 1, 1));
 
-	protected virtual void ProcessDist(uint dist, uint length, out uint spiralLength, uint maxDist)
-	{
-		result[^1].Add(new(dist, maxDist + lzData.UseSpiralLengths + 1));
-		if (decoding.ProcessLZSpiralLength(lzData, ref dist, out spiralLength, maxDist))
-			result[^1].Add(new(spiralLength, lzData.SpiralLength.Max + 1));
-		fullLength += (int)((length + 2) * (spiralLength + 1));
-	}
-
-	protected virtual List<ShortIntervalList> Postrequisites() => new LempelZivDec(result, lz != 0, new() { UseSpiralLengths = lzData.UseSpiralLengths }, 0).Decode();
+	protected virtual List<ShortIntervalList> Postrequisites() => result;
 }
