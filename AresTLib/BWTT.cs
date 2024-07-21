@@ -3,47 +3,52 @@ using Mpir.NET;
 
 namespace AresTLib;
 
-internal partial class Compression
+internal class BWTT(List<ShortIntervalList> Input, List<ShortIntervalList> Result, int TN)
 {
-	public List<ShortIntervalList> BWT(List<ShortIntervalList> input, bool words = false)
+	public List<ShortIntervalList> Encode(bool words = false)
 	{
-		if (input.Length == 0)
+		if (Input.Length == 0)
 			throw new EncoderFallbackException();
-		if (input[0].Contains(HuffmanApplied) || input[0].Contains(BWTApplied))
-			return input;
-		Current[tn] = 0;
-		CurrentMaximum[tn] = ProgressBarStep * 2;
-		var lz = CreateVar(input[0].IndexOf(LempelZivApplied), out var lzIndex) != -1;
-		var startPos = (lz ? (input[0].Length >= lzIndex + BWTBlockExtraSize && input[0][lzIndex + 1] == LempelZivSubdivided ? 3 : 2) : 1) + (input[0].Length >= 1 && input[0][0] == LengthsApplied ? (int)input[0][1].Base : 0);
-		if (!(input.Length >= startPos + BWTBlockExtraSize && input.GetSlice(startPos).All(x => x.Length == 1 && x[0].Base == ValuesInByte)))
+		if (Input[0].Contains(HuffmanApplied) || Input[0].Contains(BWTApplied))
+			return Input;
+		Current[TN] = 0;
+		CurrentMaximum[TN] = ProgressBarStep * 2;
+		var lz = CreateVar(Input[0].IndexOf(LempelZivApplied), out var lzIndex) != -1;
+		var startPos = (lz ? (Input[0].Length >= lzIndex + BWTBlockExtraSize && Input[0][lzIndex + 1] == LempelZivSubdivided ? 3 : 2) : 1) + (Input[0].Length >= 1 && Input[0][0] == LengthsApplied ? (int)Input[0][1].Base : 0);
+		var wordsApplied = Input[startPos].Length > 1;
+		if (!(Input.Length >= startPos + BWTBlockExtraSize))
 			throw new EncoderFallbackException();
-		result.Replace(input.GetSlice(0, startPos));
-		result[0] = new(result[0]);
-		Status[tn] = 0;
-		StatusMaximum[tn] = 7;
-		var byteInput = input.GetSlice(startPos).ToNList(x => (byte)x[0].Lower);
-		Status[tn]++;
+		Result.Replace(Input.GetSlice(0, startPos));
+		if (!wordsApplied)
+			Result[0] = new(Result[0]) { new((uint)BitsCount((uint)BWTBlockSize) - 14, 18) };
+		Status[TN] = 0;
+		StatusMaximum[TN] = 7;
+		var byteInput = Input.GetSlice(startPos).ToNList(x => wordsApplied ? x[0].Lower * 2 + x[1].Lower : x[0].Lower);
+		Status[TN]++;
 		var uniqueElems = byteInput.ToHashSet();
-		Status[tn]++;
+		Status[TN]++;
 		var uniqueElems2 = uniqueElems.ToNList().Sort();
-		Status[tn]++;
+		Status[TN]++;
 		var inputPos = startPos;
-		NList<byte> byteResult;
-		Status[tn] = 0;
-		StatusMaximum[tn] = byteInput.Length;
-		Current[tn] += ProgressBarStep;
-		byteResult = byteInput.Copy().AddRange(new byte[GetArrayLength(byteInput.Length, BWTBlockSize) * BWTBlockExtraSize]);
+		NList<uint> byteResult;
+		Status[TN] = 0;
+		StatusMaximum[TN] = byteInput.Length;
+		Current[TN] += ProgressBarStep;
+		byteResult = byteInput.Copy().AddRange(new uint[GetArrayLength(byteInput.Length, BWTBlockSize) * BWTBlockExtraSize]);
 		BWTInternal();
+		Status[TN] = 0;
+		StatusMaximum[TN] = byteResult.Length;
+		Current[TN] += ProgressBarStep;
 		byteInput.Clear();
 		for (var i = 0; i < byteResult.Length; i += BWTBlockSize)
 			byteInput.AddRange(byteResult.GetRange(i..(i += BWTBlockExtraSize))).AddRange(ZLE(byteResult.Skip(i).Take(BWTBlockSize), byteInput.GetRange(^BWTBlockExtraSize..), uniqueElems2[0]));
 		uniqueElems2 = byteResult.Filter((x, index) => index % (BWTBlockSize + BWTBlockExtraSize) >= BWTBlockExtraSize).ToHashSet().ToNList().Sort();
-		result.AddRange(byteInput.Convert(x => new ShortIntervalList() { new(x, ValuesInByte) }));
-		result[0].Add(BWTApplied);
+		Result.AddRange(byteInput.Convert((x, index) => new ShortIntervalList() { new(x, index >= BWTBlockExtraSize && wordsApplied ? Input[startPos][0].Base * 2 : ValuesInByte) }));
+		Result[0].Add(BWTApplied);
 		uniqueElems.ExceptWith(uniqueElems2);
 #if DEBUG
-		var input2 = input.Skip(startPos);
-		var decoded = new DecodingT().DecodeBWT(result.GetRange(startPos), [.. uniqueElems]);
+		var input2 = Input.Skip(startPos);
+		var decoded = new DecodingT().DecodeBWT(Result.GetRange(startPos), [.. uniqueElems], BWTBlockSize);
 		for (var i = 0; i < input2.Length && i < decoded.Length; i++)
 			for (var j = 0; j < input2[i].Length && j < decoded[i].Length; j++)
 			{
@@ -55,22 +60,22 @@ internal partial class Compression
 		if (input2.Length != decoded.Length)
 			throw new DecoderFallbackException();
 #endif
-		var c = uniqueElems.PConvert(x => new Interval(x, ValuesInByte));
+		var c = uniqueElems.PConvert(x => new Interval(x, wordsApplied ? Input[startPos][0].Base * 2 : ValuesInByte));
 		c.Insert(0, GetCountList((uint)uniqueElems.Length));
 		var cSplit = c.SplitIntoEqual(8);
 		c.Dispose();
 		var cLength = (uint)cSplit.Length;
-		result[0].Add(new(0, cLength, cLength));
-		result.Insert(startPos, cSplit.PConvert(x => new ShortIntervalList(x)));
+		Result[0].Add(new(0, cLength, cLength));
+		Result.Insert(startPos, cSplit.PConvert(x => new ShortIntervalList(x)));
 		cSplit.Dispose();
-		return result;
+		return Result;
 		void BWTInternal()
 		{
-			var buffer = RedStarLinq.FillArray(Environment.ProcessorCount, index => byteInput.Length < BWTBlockSize * (index + 1) ? default! : new byte[BWTBlockSize * 2 - 1]);
-			var currentBlock = RedStarLinq.FillArray(buffer.Length, index => byteInput.Length < BWTBlockSize * (index + 1) ? default! : new byte[BWTBlockSize]);
-			var indexes = RedStarLinq.FillArray(buffer.Length, index => byteInput.Length < BWTBlockSize * (index + 1) ? default! : new int[BWTBlockSize]);
+			var buffer = RedStarLinq.FillArray(Environment.ProcessorCount, index => byteInput.Length < BWTBlockSize * (index + 1) ? default! : GC.AllocateUninitializedArray<uint>(BWTBlockSize * 2 - 1));
+			var currentBlock = RedStarLinq.FillArray(buffer.Length, index => byteInput.Length < BWTBlockSize * (index + 1) ? default! : GC.AllocateUninitializedArray<uint>(BWTBlockSize));
+			var indexes = RedStarLinq.FillArray(buffer.Length, index => byteInput.Length < BWTBlockSize * (index + 1) ? default! : GC.AllocateUninitializedArray<int>(BWTBlockSize));
 			var tasks = new Task[buffer.Length];
-			var MTFMemory = RedStarLinq.FillArray<byte[]>(buffer.Length, _ => default!);
+			var MTFMemory = RedStarLinq.FillArray<uint[]>(buffer.Length, _ => default!);
 			for (var i = 0; i < GetArrayLength(byteInput.Length, BWTBlockSize); i++)
 			{
 				tasks[i % buffer.Length]?.Wait();
@@ -82,9 +87,9 @@ internal partial class Compression
 					currentBlock[i % buffer.Length] = default!;
 					indexes[i % buffer.Length] = default!;
 					GC.Collect();
-					buffer[i % buffer.Length] = new byte[(byteInput.Length - i2) * 2 - 1];
-					currentBlock[i % buffer.Length] = new byte[byteInput.Length - i2];
-					indexes[i % buffer.Length] = new int[byteInput.Length - i2];
+					buffer[i % buffer.Length] = GC.AllocateUninitializedArray<uint>((byteInput.Length - i2) * 2 - 1);
+					currentBlock[i % buffer.Length] = GC.AllocateUninitializedArray<uint>(byteInput.Length - i2);
+					indexes[i % buffer.Length] = GC.AllocateUninitializedArray<int>(byteInput.Length - i2);
 				}
 				for (var j = 0; j < length; j++)
 					currentBlock[i % buffer.Length][j] = byteInput[i2 + j];
@@ -104,14 +109,19 @@ internal partial class Compression
 				}
 				WriteToMTF(blockIndex);
 			}
-			void GetBWT(byte[] source, byte[] buffer, int[] indexes, byte[] result, ref int firstPermutation)
+			void GetBWT(uint[] source, uint[] buffer, int[] indexes, uint[] Result, ref int firstPermutation)
 			{
 				CopyMemory(source, 0, buffer, 0, source.Length);
 				CopyMemory(source, 0, buffer, source.Length, source.Length - 1);
 				for (var i = 0; i < indexes.Length; i++)
 					indexes[i] = i;
-				var chainLength = buffer.BWTCompare(source.Length);
-				new Chain(chainLength).ForEach(i => indexes.NSort(x => buffer[chainLength - 1 - i + x]));
+				var indexesToSort = buffer.BWTCompare(source.Length);
+				foreach (var index in indexesToSort)
+				{
+					indexes.NSort(x => buffer[index + x]);
+					Status[TN] += (int)Floor((double)source.Length / indexesToSort.Length);
+				}
+				indexesToSort.Dispose();
 #if DEBUG
 				if (indexes.ToHashSet().Length != indexes.Length)
 					throw new InvalidOperationException();
@@ -119,7 +129,7 @@ internal partial class Compression
 				firstPermutation = Array.IndexOf(indexes, 0);
 				// Копирование результата
 				for (var i = 0; i < source.Length; i++)
-					result[i] = buffer[indexes[i] + indexes.Length - 1];
+					Result[i] = buffer[indexes[i] + indexes.Length - 1];
 			}
 			void WriteToMTF(int blockIndex)
 			{
@@ -130,40 +140,46 @@ internal partial class Compression
 					byteResult[(BWTBlockSize + BWTBlockExtraSize) * blockIndex + i + BWTBlockExtraSize] = uniqueElems2[index];
 					Array.Copy(MTFMemory[blockIndex % buffer.Length]!, 0, MTFMemory[blockIndex % buffer.Length]!, 1, index);
 					MTFMemory[blockIndex % buffer.Length][0] = elem;
-					Status[tn]++;
+					Status[TN]++;
 				}
 			}
 		}
 	}
 
-	private static Slice<byte> ZLE(Slice<byte> input, NList<byte> firstPermutationRange, byte zero)
+	private Slice<uint> ZLE(Slice<uint> input, NList<uint> firstPermutationRange, uint zero)
 	{
-		var frequency = new int[ValuesInByte];
+		var frequency = new int[input.Max() + 1];
 		for (var i = 0; i < input.Length; i++)
 			frequency[input[i]]++;
-		var zeroB = Array.IndexOf(frequency, 0);
-		if (zeroB == -1)
-			return input;
-		var result = new NList<byte>(input.Length + 2) { zero, (byte)zeroB };
+		var zeroB = (uint)Array.IndexOf(frequency, 0);
+		if (zeroB == uint.MaxValue)
+			zeroB = input.Max() + 1;
+		var Result = new NList<uint>(input.Length + 2) { zero, zeroB };
 		for (var i = 0; i < input.Length;)
 		{
 			while (i < input.Length && input[i] != zero)
-				result.Add(input[i++]);
+			{
+				Result.Add(input[i++]);
+				Status[TN]++;
+			}
 			if (i >= input.Length)
 				break;
 			var j = i;
-			while (i < input.Length && i - j < ValuesIn2Bytes && input[i] == zero)
+			while (i < input.Length && input[i] == zero)
+			{
 				i++;
+				Status[TN]++;
+			}
 			if (i == j)
 				throw new EncoderFallbackException();
-			result.AddRange(((MpzT)(i - j + 1)).ToString(2)?.Skip(1).ToArray(x => (byte)(x == '1' ? zeroB : x == '0' ? zero : throw new EncoderFallbackException())));
+			Result.AddRange(((MpzT)(i - j + 1)).ToString(2)?.Skip(1).ToArray(x => x == '1' ? zeroB : x == '0' ? zero : throw new EncoderFallbackException()));
 		}
-		if (result.Length < input.Length * 0.936)
-			return result.GetSlice();
-		else
+		if (Result.Length < input.Length * 0.936)
 		{
 			firstPermutationRange[0] |= ValuesInByte >> 1;
-			return input;
+			return Result.GetSlice();
 		}
+		else
+			return input;
 	}
 }

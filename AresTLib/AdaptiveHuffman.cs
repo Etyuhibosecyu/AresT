@@ -6,7 +6,7 @@ internal record class AdaptiveHuffman(int TN)
 	private bool lz;
 	private int bwtLength, startPos;
 	private uint firstIntervalDist;
-	private readonly SumSet<uint> set = [];
+	private readonly SumSet<uint> set = [], newItems = [];
 	private readonly SumList lengthsSL = [], distsSL = [];
 
 	public byte[] Encode(List<ShortIntervalList> input, LZData lzData)
@@ -33,20 +33,34 @@ internal record class AdaptiveHuffman(int TN)
 		return ar;
 	}
 
-	private bool AdaptiveHuffmanInternal(ArithmeticEncoder ar, List<ShortIntervalList> input, LZData lzData, int n = 1)
+	private bool AdaptiveHuffmanInternal(ArithmeticEncoder ar, List<ShortIntervalList> input, LZData lzData, int blockIndex = 1)
 	{
 		Prerequisites(input);
 		ar.WriteCount((uint)input.Length);
+		var isWritingSkipped = false;
 		for (var i = 0; i < startPos; i++)
 			for (var j = 0; j < input[i].Length; j++)
 			{
 				var x = input[i][j];
 				if (i == startPos - bwtLength && j == 2)
+				{
 					ar.WriteCount(x.Base);
-				ar.WritePart(x.Lower, x.Length, x.Base);
+					newItems.Replace(RedStarLinq.NFill((int)x.Base, index => ((uint)index, 1)));
+					isWritingSkipped = true;
+				}
+				if (isWritingSkipped)
+				{
+					var sum = newItems.GetLeftValuesSum(x.Lower, out var newElem);
+					ar.WritePart((uint)sum, (uint)newElem, (uint)newItems.ValuesSum);
+					newItems.RemoveValue(x.Lower);
+				}
+				else
+					ar.WritePart(x.Lower, x.Length, x.Base);
 			}
 		Status[TN]++;
-		var newBase = input[startPos][0].Base + (lz ? 1u : 0);
+		var newBase = input[startPos + (newItems.Length != 0 ? BWTBlockExtraSize : 0)][0].Base + (lz ? 1u : 0);
+		if (bwtLength != 0 && newItems.Length == 0)
+			newItems.Replace(RedStarLinq.NFill((int)newBase, index => ((uint)index, 1)));
 		ar.WriteCount(newBase);
 		Status[TN] = 0;
 		StatusMaximum[TN] = input.Length - startPos;
@@ -57,7 +71,7 @@ internal record class AdaptiveHuffman(int TN)
 		firstIntervalDist = lz ? (lzData.Dist.R == 1 ? lzData.Dist.Threshold + 2 : lzData.Dist.Max + 1) + lzData.UseSpiralLengths : 0;
 		if (lz)
 			set.Add((newBase - 1, 1));
-		new AdaptiveHuffmanMain(ar, input, lzData, n, startPos, lz, newBase, set, lengthsSL, distsSL, firstIntervalDist, TN).MainProcess();
+		new AdaptiveHuffmanMain(ar, input, lzData, blockIndex, startPos, lz, newBase, set, lengthsSL, distsSL, firstIntervalDist, newItems, TN).MainProcess();
 		return true;
 	}
 
@@ -85,7 +99,7 @@ internal record class AdaptiveHuffman(int TN)
 	}
 }
 
-file sealed record class AdaptiveHuffmanMain(ArithmeticEncoder Ar, List<ShortIntervalList> Input, LZData LZData, int N, int StartPos, bool LZ, uint NewBase, SumSet<uint> Set, SumList LengthsSL, SumList DistsSL, uint FirstIntervalDist, int TN)
+file sealed record class AdaptiveHuffmanMain(ArithmeticEncoder Ar, List<ShortIntervalList> Input, LZData LZData, int BlockIndex, int StartPos, bool LZ, uint NewBase, SumSet<uint> Set, SumList LengthsSL, SumList DistsSL, uint FirstIntervalDist, SumSet<uint> NewItems, int TN)
 {
 	private int frequency, fullLength;
 	private uint lzLength, lzDist, lzSpiralLength, maxDist, bufferInterval;
@@ -98,20 +112,34 @@ file sealed record class AdaptiveHuffmanMain(ArithmeticEncoder Ar, List<ShortInt
 		for (var i = StartPos; i < Input.Length; i++, Status[TN]++)
 		{
 			item = Input[i][0].Lower;
+			if (NewItems.Length != 0 && i < StartPos + BWTBlockExtraSize)
+			{
+				Ar.WriteEqual(item, ValuesInByte);
+				continue;
+			}
 			sum = Set.GetLeftValuesSum(item, out frequency);
 			bufferInterval = Max((uint)Set.Length, 1);
 			var fullBase = (uint)(Set.ValuesSum + bufferInterval);
 			if (frequency == 0)
-			{
-				Ar.WritePart((uint)Set.ValuesSum, bufferInterval, fullBase);
-				if (N != 2)
-					Ar.WriteEqual(item, NewBase);
-			}
+				WriteNewItem(fullBase);
 			else
 				Ar.WritePart((uint)sum, (uint)frequency, fullBase);
 			Set.Increase(item);
 			lzLength = lzDist = lzSpiralLength = 0;
 			EncodeNextIntervals(i);
+		}
+	}
+
+	private void WriteNewItem(uint fullBase)
+	{
+		Ar.WritePart((uint)Set.ValuesSum, bufferInterval, fullBase);
+		if (BlockIndex != 2)
+			Ar.WriteEqual(item, NewBase);
+		else if (NewItems.Length != 0)
+		{
+			var sum = NewItems.GetLeftValuesSum(item, out var newElem);
+			Ar.WritePart((uint)sum, (uint)newElem, (uint)NewItems.ValuesSum);
+			NewItems.RemoveValue(item);
 		}
 	}
 

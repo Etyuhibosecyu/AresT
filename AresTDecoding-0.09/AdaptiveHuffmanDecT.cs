@@ -6,17 +6,17 @@ public class AdaptiveHuffmanDecT
 	private readonly DecodingT decoding = default!;
 	protected ArithmeticDecoder ar = default!;
 	protected List<ShortIntervalList> result = default!;
-	protected NList<byte> skipped = default!;
-	protected SumSet<uint> set = default!;
-	protected List<Interval> uniqueList = default!;
+	protected NList<uint> skipped = default!;
+	protected SumSet<uint> set = default!, newItems = default!;
+	protected NList<Interval> uniqueList = default!;
 	protected LZData lzData = default!;
 	protected uint fileBase, nextWordLink;
-	protected int lz, bwt, n, fullLength, counter;
+	protected int lz, bwt, blockIndex, fullLength, bwtBlockSize, bwtBlockExtraSize, counter;
 	protected SumList lengthsSL, distsSL;
 	protected int lzLength;
 	protected uint firstIntervalDist;
 
-	public AdaptiveHuffmanDecT(DecodingT decoding, ArithmeticDecoder ar, NList<byte> skipped, LZData lzData, int lz, int bwt, int n, int counter)
+	public AdaptiveHuffmanDecT(DecodingT decoding, ArithmeticDecoder ar, NList<uint> skipped, LZData lzData, int lz, int bwt, int blockIndex, int bwtBlockSize, int counter)
 	{
 		this.decoding = decoding;
 		this.ar = ar;
@@ -24,7 +24,9 @@ public class AdaptiveHuffmanDecT
 		this.lzData = lzData;
 		this.lz = lz;
 		this.bwt = bwt;
-		this.n = n;
+		this.blockIndex = blockIndex;
+		this.bwtBlockSize = bwtBlockSize;
+		bwtBlockExtraSize = bwtBlockSize <= 0x4000 ? 2 : bwtBlockSize <= 0x400000 ? 3 : bwtBlockSize <= 0x40000000 ? 4 : 5;
 		this.counter = counter;
 		Prerequisites();
 		lengthsSL = lz != 0 ? new(RedStarLinq.Fill(1, (int)(lzData.Length.R == 0 ? lzData.Length.Max + 1 : lzData.Length.R == 1 ? lzData.Length.Threshold + 2 : lzData.Length.Max - lzData.Length.Threshold + 2))) : new();
@@ -43,22 +45,29 @@ public class AdaptiveHuffmanDecT
 
 	protected virtual void Prerequisites()
 	{
-		if (bwt != 0 && n == 1)
-		{
-			var skippedCount = (int)ar.ReadCount();
-			var @base = skippedCount == 0 ? 1 : ar.ReadCount();
-			if (skippedCount > @base || @base > decoding.GetFragmentLength())
-				throw new DecoderFallbackException();
-			for (var i = 0; i < skippedCount; i++)
-				skipped.Add((byte)ar.ReadEqual(@base));
-			counter -= skippedCount == 0 ? 1 : (skippedCount + 9) / 8;
-		}
+		if (bwt != 0 && blockIndex != 0)
+			DecodeSkipped();
 		fileBase = ar.ReadCount();
 		if (counter < 0 || counter > decoding.GetFragmentLength() + (bwt == 0 ? 0 : decoding.GetFragmentLength() >> 8))
 			throw new DecoderFallbackException();
 		Status[0] = 0;
 		StatusMaximum[0] = counter;
 		set = [(uint.MaxValue, 1)];
+	}
+
+	private void DecodeSkipped()
+	{
+		var skippedCount = (int)ar.ReadCount();
+		var @base = skippedCount == 0 ? 1 : ar.ReadCount();
+		newItems = new(RedStarLinq.NFill((int)@base, index => ((uint)index, 1)));
+		if (skippedCount > @base || @base > decoding.GetFragmentLength())
+			throw new DecoderFallbackException();
+		for (var i = 0; i < skippedCount; i++)
+		{
+			skipped.Add(newItems[ar.ReadPart(newItems)].Key);
+			newItems.RemoveValue(skipped[^1]);
+		}
+		counter -= skippedCount == 0 ? 1 : (skippedCount + 9) / 8;
 	}
 
 	protected virtual void Prerequisites2()
@@ -77,7 +86,7 @@ public class AdaptiveHuffmanDecT
 		var readIndex = ReadFirst();
 		if (!(lz != 0 && uniqueList[readIndex].Lower == fileBase - 1))
 		{
-			result.Add(n == 2 ? new() { uniqueList[readIndex], new(ar.ReadEqual(2), 2) } : new() { uniqueList[readIndex] });
+			result.Add(bwt == 0 && blockIndex == 2 ? new() { uniqueList[readIndex], new(ar.ReadEqual(2), 2) } : bwt != 0 && blockIndex != 0 && result.Length < bwtBlockExtraSize ? [new((uint)readIndex, ValuesInByte)] : new() { uniqueList[readIndex] });
 			lzLength++;
 			if (lz != 0 && distsSL.Length < firstIntervalDist)
 				distsSL.Insert(distsSL.Length - ((int)lzData.UseSpiralLengths + 1), 1);
@@ -99,21 +108,34 @@ public class AdaptiveHuffmanDecT
 
 	protected virtual int ReadFirst()
 	{
+		if (bwt != 0 && blockIndex != 0 && result.Length < bwtBlockExtraSize)
+			return (int)ar.ReadEqual(ValuesInByte);
 		var readIndex = ar.ReadPart(set);
 		if (readIndex == set.Length - 1)
-		{
-			var actualIndex = n == 2 ? nextWordLink++ : ar.ReadEqual(fileBase);
-			if (!set.TryAdd((actualIndex, 1), out readIndex))
-				throw new DecoderFallbackException();
-			uniqueList.Insert(readIndex, new Interval(actualIndex, fileBase));
-		}
+			readIndex = ReadNewItem();
 		else
 			set.Increase(uniqueList[readIndex].Lower);
 		FirstUpdateSet();
 		return readIndex;
 	}
 
+	private int ReadNewItem()
+	{
+		uint actualIndex;
+		if (bwt != 0 && blockIndex == 2)
+		{
+			actualIndex = newItems[ar.ReadPart(newItems)].Key;
+			newItems.RemoveValue(actualIndex);
+		}
+		else
+			actualIndex = blockIndex != 2 ? ar.ReadEqual(fileBase) : nextWordLink++;
+		if (!set.TryAdd((actualIndex, 1), out var readIndex))
+			throw new DecoderFallbackException();
+		uniqueList.Insert(readIndex, new Interval(actualIndex, fileBase));
+		return readIndex;
+	}
+
 	protected virtual void FirstUpdateSet() => set.Update(uint.MaxValue, Max(set.Length - 1, 1));
 
-	protected virtual List<ShortIntervalList> Postrequisites() => result;
+	protected virtual List<ShortIntervalList> Postrequisites() => bwt != 0 && blockIndex == 2 ? result.ToList((x, index) => index < bwtBlockExtraSize ? x : new ShortIntervalList() { new(x[0].Lower / 2, fileBase / 2), new(x[0].Lower % 2, 2) }) : result;
 }

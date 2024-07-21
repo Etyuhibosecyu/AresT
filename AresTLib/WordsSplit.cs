@@ -1,7 +1,7 @@
 ﻿
 namespace AresTLib;
 
-partial class Compression
+internal partial class Compression
 {
 	private List<List<ShortIntervalList>> MakeWordsSplit(bool comb)
 	{
@@ -52,12 +52,10 @@ partial class Compression
 		Status[tn]++;
 		var maxLength = lengths.Max();
 		Status[tn]++;
-		var lengthsSum = lengths.Sum();
-		Status[tn]++;
 		var indexCodes = wordsWithoutSpaces.RepresentIntoNumbers();
 		Status[tn]++;
 		List<List<ShortIntervalList>> result = [];
-		List<Interval> c = [new(encoding, 3)];
+		NList<Interval> c = [new(encoding, 3)];
 		c.WriteCount(maxLength);
 		result.Add(lengths.PConvert(x => new ShortIntervalList { new(x, maxLength + 1) }));
 		Status[tn]++;
@@ -67,7 +65,7 @@ partial class Compression
 		Status[tn]++;
 		if (encoding == 2)
 		{
-			List<Interval> utf8List = [];
+			NList<Interval> utf8List = [];
 			utf8List.WriteCount((uint)leftRedundantBytes.Length);
 			foreach (var x in leftRedundantBytes)
 				utf8List.Add(new(x, ValuesInByte));
@@ -76,7 +74,7 @@ partial class Compression
 				utf8List.Add(new(x, ValuesInByte));
 			result.Add(utf8List.PConvert(x => new ShortIntervalList() { x }));
 		}
-		List<Interval> nullIntervals = [];
+		NList<Interval> nullIntervals = [];
 		nullIntervals.WriteCount((uint)nulls.Length);
 		for (var i = 0; i < nulls.Length; i++)
 			nullIntervals.WriteCount((uint)(nulls[i] - CreateVar(i == 0 ? 0 : nulls[i - 1] + 1, out var prev)));

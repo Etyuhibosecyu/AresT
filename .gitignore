@@ -457,6 +457,7 @@ $RECYCLE.BIN/
 *.txt
 *.ares-t
 /AresT.iss
+/Files
 *.exe
 *.bat
 *.keystore

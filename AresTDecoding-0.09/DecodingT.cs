@@ -7,6 +7,7 @@ global using System.Threading;
 global using System.Threading.Tasks;
 global using UnsafeFunctions;
 global using G = System.Collections.Generic;
+global using static AresGlobalMethods.DecodingExtents;
 global using static AresTLib.Global;
 global using static Corlib.NStar.Extents;
 global using static System.Math;
@@ -25,7 +26,7 @@ public enum UsedMethodsT
 	COMB1 = 1 << 2,
 	FAB1 = 1 << 3,
 	CS2 = 1 << 4,
-	LZ2 = 1 << 5,
+	COMB2 = 1 << 5,
 	//Dev2 = 1 << 6,
 	CS3 = 1 << 7,
 	//Dev3 = 1 << 8,
@@ -35,13 +36,6 @@ public enum UsedMethodsT
 public static class Global
 {
 	public const byte ProgramVersion = 1;
-	public const int WordsListActualParts = 3;
-	public static int BWTBlockSize { get; set; } = 50000;
-#pragma warning disable CS0652 // Сравнение с константой интеграции бесполезно: константа находится за пределами диапазона типа
-	public static int BWTBlockExtraSize => BWTBlockSize <= 0x8000 ? 2 : BWTBlockSize <= 0x800000 ? 3 : BWTBlockSize <= 0x80000000 ? 4 : BWTBlockSize <= 0x8000000000 ? 5 : BWTBlockSize <= 0x800000000000 ? 6 : BWTBlockSize <= 0x80000000000000 ? 7 : 8;
-#pragma warning restore CS0652 // Сравнение с константой интеграции бесполезно: константа находится за пределами диапазона типа
-	public static int FragmentLength { get; set; } = 16000000;
-	public static int PreservedFragmentLength { get; set; } = FragmentLength;
 	public static UsedMethodsT PresentMethodsT { get; set; } = UsedMethodsT.CS1 | UsedMethodsT.LZ1;
 	public static Encoding Encoding1251 { get; } = Encoding.GetEncoding(1251);
 	public static Dictionary<(byte, byte), byte>[] UnicodeDic { get; } = new[] { Encoding.Unicode, Encoding.UTF8 }.ToArray(l => new Chain(0x0400, 0x60).ToDictionary(x => ((byte, byte))l.GetBytes("" + (char)x).ToNList(), x => unchecked((byte)(x - 0x0400 + 0x80))));
@@ -50,6 +44,7 @@ public static class Global
 
 public class DecodingT
 {
+	protected GlobalDecoding globalDecoding = default!;
 	protected ArithmeticDecoder ar = default!;
 	protected int misc, lz, bwt, n;
 	protected int repeatsCount = 1;
@@ -94,6 +89,7 @@ public class DecodingT
 	protected virtual NList<byte> ProcessMisc0(byte[] compressedFile, out uint encoding)
 	{
 		ar = compressedFile[1..];
+		globalDecoding = CreateGlobalDecoding();
 		PPMWGetEncodingAndNulls(out encoding, out var maxLength, out var nulls);
 		var list = PPMWFillTripleList(encoding, maxLength);
 		return JoinWords(list, nulls);
@@ -104,6 +100,7 @@ public class DecodingT
 		Current[0] = 0;
 		CurrentMaximum[0] = ProgressBarStep * (bwt != 0 ? 6 : 5);
 		ar = compressedFile[1..];
+		globalDecoding = CreateGlobalDecoding();
 		ListHashSet<int> nulls = [];
 		return JoinWords(FillHFWTripleList(nulls), nulls);
 	}
@@ -178,21 +175,12 @@ public class DecodingT
 
 	protected virtual void PPMWGetEncodingAndNulls(out uint encoding, out uint maxLength, out ListHashSet<int> nulls)
 	{
-		GetRepeatsCount();
 		(encoding, maxLength, var nullCount) = (ar.ReadEqual(3), ar.ReadCount(), ar.ReadCount());
 		if (maxLength < 2 || maxLength > GetFragmentLength() || nullCount > GetFragmentLength())
 			throw new DecoderFallbackException();
 		nulls = [];
 		for (var i = 0; i < nullCount; i++)
 			nulls.Add((int)ar.ReadCount() + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
-	}
-
-	public virtual void GetRepeatsCount()
-	{
-		var repeats = ar.ReadPart(new NList<uint>(2, 224, 225));
-		repeatsCount = repeats == 0 ? 1 : (int)ar.ReadCount() + 2;
-		if (repeatsCount > GetFragmentLength() >> 1)
-			throw new DecoderFallbackException();
 	}
 
 	protected virtual List<List<ShortIntervalList>> ProcessUTF8(List<List<ShortIntervalList>> list, bool utf8)
@@ -229,18 +217,22 @@ public class DecodingT
 
 	public virtual uint GetFragmentLength() => (uint)FragmentLength;
 
-	protected virtual List<List<ShortIntervalList>> FillHFWTripleList(ListHashSet<int> nulls) => ProcessUTF8(CreateVar(RedStarLinq.Fill(3, i => CreateDecoding2(nulls, i).Decode()), out var list), list[0][^1][0].Lower == 2);
+	protected virtual List<List<ShortIntervalList>> FillHFWTripleList(ListHashSet<int> nulls)
+	{
+		var bwtBlockSize = 0;
+		return ProcessUTF8(CreateVar(RedStarLinq.Fill(3, i => CreateDecoding2(nulls, i, ref bwtBlockSize).Decode()), out var list), list[0][^1][0].Lower == 2);
+	}
 
 	protected virtual List<List<ShortIntervalList>> PPMWFillTripleList(uint encoding, uint maxLength)
 	{
 		Current[0] = 0;
 		CurrentMaximum[0] = ProgressBarStep * 3;
-		List<List<ShortIntervalList>> list = CreatePPM(maxLength, 0).Decode();
+		List<List<ShortIntervalList>> list = globalDecoding.CreatePPM(maxLength, 0).Decode();
 		list[0].Add([new(encoding, 3)]);
 		Current[0] += ProgressBarStep;
-		list.Add(CreatePPM(ValuesInByte, 1).Decode());
+		list.Add(globalDecoding.CreatePPM(ValuesInByte, 1).Decode());
 		Current[0] += ProgressBarStep;
-		list.Add(CreatePPM((uint)list[0].Length - 1, 2).Decode());
+		list.Add(globalDecoding.CreatePPM((uint)list[0].Length - 1, 2).Decode());
 		Current[0] += ProgressBarStep;
 		ProcessUTF8(list, encoding == 2);
 		return list;
@@ -248,38 +240,40 @@ public class DecodingT
 
 	public virtual uint GetNullsCount() => ar.ReadCount();
 
-	protected virtual Decoding2T CreateDecoding2(ListHashSet<int> nulls, int i) => new(this, ar, nulls, bwt, bwt == 0 || i == 2 ? lz : 0, n = i);
+	public virtual GlobalDecoding CreateGlobalDecoding() => new(ar);
 
-	protected virtual PPMDecT CreatePPM(uint @base, int n = -1) => new(this, ar, @base, n);
+	protected virtual Decoding2T CreateDecoding2(ListHashSet<int> nulls, int i, ref int bwtBlockSize) => new(this, ar, nulls, bwt, bwt == 0 || i == 2 ? lz : 0, n = i, ref bwtBlockSize);
 
-	public virtual List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, NList<byte> skipped)
+	public virtual List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, NList<uint> skipped, int bwtBlockSize)
 	{
+		var bwtBlockExtraSize = bwtBlockSize <= 0x4000 ? 2 : bwtBlockSize <= 0x400000 ? 3 : bwtBlockSize <= 0x40000000 ? 4 : 5;
 		Status[0] = 0;
-		StatusMaximum[0] = GetArrayLength(input.Length, BWTBlockSize + BWTBlockExtraSize);
-		var bytes = input.Convert(x => (byte)x[0].Lower);
-		NList<byte> bytes2 = [];
+		StatusMaximum[0] = GetArrayLength(input.Length, bwtBlockSize + bwtBlockExtraSize);
+		var bytes = input.Convert(x => x.Length > 1 ? x[0].Lower * 2 + x[1].Lower : x[0].Lower);
+		NList<uint> bytes2 = [];
 		for (var i = 0; i < bytes.Length;)
 		{
 			var zle = bytes[i] & ValuesInByte >> 1;
-			bytes2.AddRange(bytes.GetSlice(i..(i += BWTBlockExtraSize)));
-			bytes2.AddRange(zle == 0 ? DecodeZLE(bytes, ref i) : bytes.GetRange(i..Min(i += BWTBlockSize, bytes.Length)));
+			bytes2.AddRange(bytes.GetSlice(i..(i += bwtBlockExtraSize)));
+			bytes2.AddRange(zle != 0 ? DecodeZLE(bytes, ref i, bwtBlockSize) : bytes.GetRange(i..Min(i += bwtBlockSize, bytes.Length)));
 		}
-		var hs = bytes2.Filter((x, index) => index % (BWTBlockSize + BWTBlockExtraSize) >= BWTBlockExtraSize).ToHashSet().Concat(skipped).Sort().ToHashSet();
+		var hs = bytes2.Filter((x, index) => index % (bwtBlockSize + bwtBlockExtraSize) >= bwtBlockExtraSize).ToHashSet().Concat(skipped).Sort().ToHashSet();
+		var @base = hs.Max() + 1;
 		List<ShortIntervalList> result = new(bytes2.Length);
-		for (var i = 0; i < bytes2.Length; i += BWTBlockSize, Status[0]++)
+		for (var i = 0; i < bytes2.Length; i += bwtBlockSize, Status[0]++)
 		{
-			if (bytes2.Length - i <= BWTBlockExtraSize)
+			if (bytes2.Length - i <= bwtBlockExtraSize)
 				throw new DecoderFallbackException();
-			var length = Min(BWTBlockSize, bytes2.Length - i - BWTBlockExtraSize);
+			var length = Min(bwtBlockSize, bytes2.Length - i - bwtBlockExtraSize);
 			bytes2[i] &= (ValuesInByte >> 1) - 1;
-			var firstPermutation = (int)bytes2.GetSlice(i, BWTBlockExtraSize).Progression(0L, (x, y) => unchecked((x << BitsPerByte) + y));
-			i += BWTBlockExtraSize;
-			result.AddRange(DecodeBWT2(bytes2.GetRange(i, length), hs, firstPermutation));
+			var firstPermutation = (int)bytes2.GetSlice(i, bwtBlockExtraSize).Progression(0L, (x, y) => unchecked((x << BitsPerByte) + y));
+			i += bwtBlockExtraSize;
+			result.AddRange(DecodeBWT2(bytes2.GetRange(i, length), hs, @base, firstPermutation));
 		}
 		return result;
 	}
 
-	protected virtual List<ShortIntervalList> DecodeBWT2(NList<byte> input, ListHashSet<byte> hs, int firstPermutation)
+	protected virtual List<ShortIntervalList> DecodeBWT2(NList<uint> input, ListHashSet<uint> hs, uint @base, int firstPermutation)
 	{
 		var mtfMemory = hs.ToArray();
 		for (var i = 0; i < input.Length; i++)
@@ -296,28 +290,28 @@ public class DecodingT
 		for (var i = 0; i < input.Length; i++)
 		{
 			it = convert[it];
-			result[i] = [new(input[it], ValuesInByte)];
+			result[i] = @base > ValuesInByte ? [new(input[it] / 2, (@base + 1) / 2), new(input[it] % 2, 2)] : [new(input[it], ValuesInByte)];
 		}
 		return result;
 	}
 
-	public virtual NList<byte> DecodeZLE(Slice<byte> byteList, ref int i)
+	public virtual NList<uint> DecodeZLE(Slice<uint> byteList, ref int i, int bwtBlockSize)
 	{
 		if (i >= byteList.Length)
 			throw new DecoderFallbackException();
-		byte zero = byteList[i++], zeroB = byteList[i++];
-		NList<byte> result = [];
+		uint zero = byteList[i++], zeroB = byteList[i++];
+		NList<uint> result = [];
 		String zeroCode = ['1'];
 		int length;
-		for (; i < byteList.Length && result.Length < BWTBlockSize;)
+		for (; i < byteList.Length && result.Length < bwtBlockSize;)
 		{
-			while (i < byteList.Length && result.Length < BWTBlockSize && byteList[i] != zero && byteList[i] != zeroB)
+			while (i < byteList.Length && result.Length < bwtBlockSize && byteList[i] != zero && byteList[i] != zeroB)
 				result.Add(byteList[i++]);
-			if (i >= byteList.Length || result.Length >= BWTBlockSize)
+			if (i >= byteList.Length || result.Length >= bwtBlockSize)
 				break;
 			zeroCode.Remove(1);
 			length = 0;
-			while (i < byteList.Length && result.Length + length < BWTBlockSize && (byteList[i] == zero || byteList[i] == zeroB))
+			while (i < byteList.Length && result.Length + length < bwtBlockSize && (byteList[i] == zero || byteList[i] == zeroB))
 			{
 				zeroCode.Add(byteList[i++] == zero ? '0' : '1');
 				length = (int)(new MpzT(zeroCode.ToString(), 2) - 1);

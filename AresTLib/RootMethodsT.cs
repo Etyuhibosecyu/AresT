@@ -31,7 +31,7 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 		}
 		originalFile2 = cstring;
 		cdl = new ShortIntervalList[originalFile2.Length + 1];
-		cdl[0] = [RepeatsNotApplied];
+		cdl[0] = [];
 		var originalFile2_ = originalFile2;
 		Parallel.For(0, originalFile2.Length, i => cdl[i + 1] = ByteIntervals[originalFile2_[i]]);
 		Subtotal[tn] += ProgressBarStep;
@@ -86,35 +86,17 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 	{
 		byte[] s;
 		List<List<ShortIntervalList>> ctl;
-		List<ShortIntervalList> dl1;
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 7;
-		ctl = MakeWordsSplit(false);
+		ctl = MakeWordsSplit((PresentMethodsT & UsedMethodsT.COMB2) != 0);
 		if (ctl.Length is not (3 or 4))
 			throw new EncoderFallbackException();
 		Subtotal[tn] += ProgressBarStep;
-		ctl[1] = new(BWT(ctl[1], true));
+		ctl[1] = new(new BWTT(ctl[1], result, tn).Encode(true));
+		Subtotal[tn] += ProgressBarStep;
+		ctl[2] = new(new BWTT(ctl[2], result, tn).Encode(true));
 		Subtotal[tn] += ProgressBarStep;
 		var lzData = new LZData[ctl.Length];
-		if ((PresentMethodsT & UsedMethodsT.LZ2) != 0)
-		{
-			dl1 = new LempelZiv(ctl[2], result, tn).Encode(out lzData[2]);
-			Subtotal[tn] += ProgressBarStep;
-			s = WorkUpTripleList(new(ctl) { [2] = dl1 }, tn);
-		}
-		else
-		{
-			dl1 = ctl[2];
-			Subtotal[tn] += ProgressBarStep;
-			s = cs;
-		}
-		Subtotal[tn] += ProgressBarStep;
-		if (s.Length < cs.Length && s.Length > 0)
-		{
-			lz = 1;
-			ctl[2] = dl1;
-			cs = s;
-		}
 		Subtotal[tn] += ProgressBarStep;
 		s = new AdaptiveHuffman(tn).Encode(ctl, lzData);
 		Subtotal[tn] += ProgressBarStep;

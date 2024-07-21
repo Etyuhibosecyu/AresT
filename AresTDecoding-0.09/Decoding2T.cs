@@ -6,15 +6,15 @@ public class Decoding2T
 	protected DecodingT decoding = default!;
 	protected ArithmeticDecoder ar = default!;
 	protected ListHashSet<int> nulls = default!;
-	protected int maxFrequency, frequencyCount, bwt, lz, counter, n;
+	protected int maxFrequency, frequencyCount, bwt, lz, counter, n, bwtBlockSize;
 	protected uint encoding, maxLength, lzRDist, lzMaxDist, lzThresholdDist, lzRLength, lzMaxLength, lzThresholdLength, lzUseSpiralLengths, lzRSpiralLength, lzMaxSpiralLength, lzThresholdSpiralLength;
 	protected MethodDataUnit lzDist = new(), lzLength = new(), lzSpiralLength = new();
 	protected LZData lzData = default!;
 	protected NList<uint> arithmeticMap = default!;
 	protected NList<Interval> uniqueList = default!;
-	protected NList<byte> skipped = default!;
+	protected NList<uint> skipped = default!;
 
-	public Decoding2T(DecodingT decoding, ArithmeticDecoder ar, ListHashSet<int> nulls, int bwt, int lz, int n)
+	public Decoding2T(DecodingT decoding, ArithmeticDecoder ar, ListHashSet<int> nulls, int bwt, int lz, int n, ref int bwtBlockSize)
 	{
 		this.decoding = decoding;
 		this.ar = ar;
@@ -23,6 +23,15 @@ public class Decoding2T
 		this.lz = lz;
 		this.n = n;
 		counter = (int)ar.ReadCount() - (n == 0 ? 2 : 1);
+		if (bwt != 0 && n == 1)
+		{
+			bwtBlockSize = (int)ar.ReadEqual(18);
+			if (bwtBlockSize < 5)
+				bwtBlockSize = 12500 << bwtBlockSize;
+			else
+				bwtBlockSize = 500000 << (bwtBlockSize - 5);
+		}
+		this.bwtBlockSize = bwtBlockSize;
 		lzDist = new();
 		lzLength = new();
 		lzSpiralLength = new();
@@ -31,8 +40,6 @@ public class Decoding2T
 		arithmeticMap = [];
 		uniqueList = [];
 		skipped = [];
-		if (n == 0)
-			decoding.GetRepeatsCount();
 	}
 
 	public virtual List<ShortIntervalList> Decode()
@@ -107,17 +114,17 @@ public class Decoding2T
 		var compressedList = DecodeAdaptive();
 		if (n == 0)
 			compressedList.Add([new(encoding, 3)]);
-		if (bwt != 0 && n == 1)
+		if (bwt != 0 && n != 0)
 		{
 			Current[0] += ProgressBarStep;
-			compressedList = decoding.DecodeBWT(compressedList, skipped);
+			compressedList = decoding.DecodeBWT(compressedList, skipped, bwtBlockSize);
 		}
 		if (n != 2)
 			Current[0] += ProgressBarStep;
 		return compressedList;
 	}
 
-	protected virtual List<ShortIntervalList> DecodeAdaptive() => new AdaptiveHuffmanDecT(decoding, ar, skipped, lzData, bwt == 0 || n == 2 ? lz : 0, bwt, n, counter).Decode();
+	protected virtual List<ShortIntervalList> DecodeAdaptive() => new AdaptiveHuffmanDecT(decoding, ar, skipped, lzData, bwt == 0 || n == 2 ? lz : 0, bwt, n, bwtBlockSize, counter).Decode();
 
 	protected virtual uint GetHuffmanBase(uint oldBase) => GetBaseWithBuffer(oldBase, true);
 }
