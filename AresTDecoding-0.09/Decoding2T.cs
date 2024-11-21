@@ -1,9 +1,10 @@
 ﻿
 namespace AresTLib;
 
-public class Decoding2T
+public class Decoding2T : IDisposable
 {
 	protected DecodingT decoding = default!;
+	protected GlobalDecoding globalDecoding = default!;
 	protected ArithmeticDecoder ar = default!;
 	protected ListHashSet<int> nulls = default!;
 	protected int maxFrequency, frequencyCount, bwt, lz, counter, n, bwtBlockSize;
@@ -14,9 +15,10 @@ public class Decoding2T
 	protected NList<Interval> uniqueList = default!;
 	protected NList<uint> skipped = default!;
 
-	public Decoding2T(DecodingT decoding, ArithmeticDecoder ar, ListHashSet<int> nulls, int bwt, int lz, int n, ref int bwtBlockSize)
+	public Decoding2T(DecodingT decoding, GlobalDecoding globalDecoding, ArithmeticDecoder ar, ListHashSet<int> nulls, int bwt, int lz, int n, ref int bwtBlockSize)
 	{
 		this.decoding = decoding;
+		this.globalDecoding = globalDecoding;
 		this.ar = ar;
 		this.nulls = nulls;
 		this.bwt = bwt;
@@ -42,7 +44,15 @@ public class Decoding2T
 		skipped = [];
 	}
 
-	public virtual List<ShortIntervalList> Decode()
+	public virtual void Dispose()
+	{
+		arithmeticMap?.Dispose();
+		uniqueList?.Dispose();
+		skipped?.Dispose();
+		GC.SuppressFinalize(this);
+	}
+
+	public virtual NList<ShortIntervalList> Decode()
 	{
 		ProcessNulls();
 		if (lz != 0)
@@ -109,11 +119,11 @@ public class Decoding2T
 		}
 	}
 
-	protected virtual List<ShortIntervalList> ProcessHuffman()
+	protected virtual NList<ShortIntervalList> ProcessHuffman()
 	{
 		var compressedList = DecodeAdaptive();
 		if (n == 0)
-			compressedList.Add([new(encoding, 3)]);
+			decoding.SetEncoding(encoding);
 		if (bwt != 0 && n != 0)
 		{
 			Current[0] += ProgressBarStep;
@@ -124,7 +134,11 @@ public class Decoding2T
 		return compressedList;
 	}
 
-	protected virtual List<ShortIntervalList> DecodeAdaptive() => new AdaptiveHuffmanDecT(decoding, ar, skipped, lzData, bwt == 0 || n == 2 ? lz : 0, bwt, n, bwtBlockSize, counter).Decode();
+	protected virtual NList<ShortIntervalList> DecodeAdaptive()
+	{
+		using var dec = new AdaptiveHuffmanDec(globalDecoding, ar, skipped, lzData, bwt == 0 || n == 2 ? lz : 0, bwt, n, bwtBlockSize, counter);
+		return dec.Decode();
+	}
 
 	protected virtual uint GetHuffmanBase(uint oldBase) => GetBaseWithBuffer(oldBase, true);
 }

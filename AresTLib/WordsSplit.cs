@@ -3,7 +3,7 @@ namespace AresTLib;
 
 internal partial class Compression
 {
-	private List<List<ShortIntervalList>> MakeWordsSplit(bool comb)
+	private List<NList<ShortIntervalList>> MakeWordsSplit(bool comb)
 	{
 		Current[tn] = 0;
 		CurrentMaximum[tn] = ProgressBarStep * 3;
@@ -44,9 +44,9 @@ internal partial class Compression
 		var uniqueWords2 = uniqueWords.PConvert(x => encoding2.GetBytes(x.String));
 		var joinedWords = ProcessUnicode(uniqueWords2.JoinIntoSingle(), encoding);
 		Status[tn]++;
-		var uniqueIntervals = RedStarLinq.Fill(uniqueWords.Length, index => new Interval((uint)index, (uint)uniqueWords.Length));
+		var uniqueIntervals = RedStarLinq.NFill(uniqueWords.Length, index => new Interval((uint)index, (uint)uniqueWords.Length));
 		var uniqueLists = uniqueIntervals.ToArray(x => new ShortIntervalList[] { [x, new Interval(0, 2)], [x, new(1, 2)] });
-		var byteLists = RedStarLinq.Fill(ValuesInByte, index => new ShortIntervalList { new((uint)index, ValuesInByte) });
+		var byteLists = RedStarLinq.NFill(ValuesInByte, index => new ShortIntervalList { new((uint)index, ValuesInByte) });
 		Status[tn]++;
 		var lengths = uniqueWords2.PNConvert(x => (uint)x.Length);
 		Status[tn]++;
@@ -54,14 +54,14 @@ internal partial class Compression
 		Status[tn]++;
 		var indexCodes = wordsWithoutSpaces.RepresentIntoNumbers();
 		Status[tn]++;
-		List<List<ShortIntervalList>> result = [];
+		List<NList<ShortIntervalList>> result = [];
 		NList<Interval> c = [new(encoding, 3)];
 		c.WriteCount(maxLength);
-		result.Add(lengths.PConvert(x => new ShortIntervalList { new(x, maxLength + 1) }));
+		result.Add(lengths.PNConvert(x => new ShortIntervalList { new(x, maxLength + 1) }));
 		Status[tn]++;
-		result.Add(joinedWords.PConvert(x => byteLists[x]));
+		result.Add(joinedWords.PNConvert(x => byteLists[x]));
 		Status[tn]++;
-		result.Add(indexCodes.PConvert((x, index) => uniqueLists[x][words[index].Space ? 1 : 0]));
+		result.Add(indexCodes.PNConvert((x, index) => uniqueLists[x][words[index].Space ? 1 : 0]));
 		Status[tn]++;
 		if (encoding == 2)
 		{
@@ -72,7 +72,7 @@ internal partial class Compression
 			utf8List.WriteCount((uint)rightRedundantBytes.Length);
 			foreach (var x in rightRedundantBytes)
 				utf8List.Add(new(x, ValuesInByte));
-			result.Add(utf8List.PConvert(x => new ShortIntervalList() { x }));
+			result.Add(utf8List.PNConvert(x => new ShortIntervalList() { x }));
 		}
 		NList<Interval> nullIntervals = [];
 		nullIntervals.WriteCount((uint)nulls.Length);
@@ -80,7 +80,7 @@ internal partial class Compression
 			nullIntervals.WriteCount((uint)(nulls[i] - CreateVar(i == 0 ? 0 : nulls[i - 1] + 1, out var prev)));
 		Status[tn]++;
 		result[0].Insert(0, CreateVar(nullIntervals.SplitIntoEqual(8).Convert(x => new ShortIntervalList(x)), out var splitNullIntervals));
-		result[0].Insert(0, new List<ShortIntervalList>() { new() { LengthsApplied, new(0, (uint)splitNullIntervals.Length + 1, (uint)splitNullIntervals.Length + 1) }, new(c) });
+		result[0].Insert(0, new NList<ShortIntervalList>() { new() { LengthsApplied, new(0, (uint)splitNullIntervals.Length + 1, (uint)splitNullIntervals.Length + 1) }, new(c) });
 		input[0].ForEach(x => result[0][0].Add(x));
 		result[1].Insert(0, new ShortIntervalList());
 		result[2].Insert(0, new ShortIntervalList() { WordsApplied, SpacesApplied });
@@ -91,9 +91,9 @@ internal partial class Compression
 			var decoded = result.Wrap(tl =>
 			{
 				var a = 0;
-				var joinedWords = new DecodingT().DecodeUnicode(tl[1].GetSlice(1).ToNList(x => (byte)x[0].Lower), encoding, encoding2).ToArray();
-				var wordsList = tl[0].GetSlice(GetArrayLength(nullIntervals.Length, 8) + 2).ToList(l => encoding2.GetString(joinedWords[a..(a += (int)l[0].Lower)]));
-				return encoding2.GetBytes(RedStarLinq.ToString(tl[2].GetSlice(1).ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => new DecodingT().DecodeCOMB(l[1].Lower == 1 ? [.. x, ' '] : x.ToList(), comb))))).Wrap(bl => encoding == 2 ? bl.ToNList().Insert(0, tl[3][2..CreateVar(leftRedundantBytes.Length + 2, out var rightStart)].ToArray(x => (byte)x[0].Lower)).AddRange(tl[3][(rightStart + 2)..(rightStart + rightRedundantBytes.Length + 2)].ToArray(x => (byte)x[0].Lower)) : bl.ToNList());
+				var joinedWords = new DecodingT().DecodeUnicode(tl[1].GetRange(1).ToNList(x => (byte)x[0].Lower), encoding, encoding2).ToArray();
+				var wordsList = tl[0].GetRange(GetArrayLength(nullIntervals.Length, 8) + 2).ToList(l => encoding2.GetString(joinedWords[a..(a += (int)l[0].Lower)]));
+				return encoding2.GetBytes(RedStarLinq.ToString(tl[2].GetRange(1).ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => new DecodingT().DecodeCOMB(l[1].Lower == 1 ? [.. x, ' '] : x.ToList(), comb))))).Wrap(bl => encoding == 2 ? bl.ToNList().Insert(0, tl[3][2..CreateVar(leftRedundantBytes.Length + 2, out var rightStart)].ToArray(x => (byte)x[0].Lower)).AddRange(tl[3][(rightStart + 2)..(rightStart + rightRedundantBytes.Length + 2)].ToArray(x => (byte)x[0].Lower)) : bl.ToNList());
 			});
 			for (var i = 0; i < original.Length; i++)
 				if (original[i] != decoded[i])

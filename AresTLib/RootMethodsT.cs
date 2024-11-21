@@ -1,13 +1,13 @@
 ﻿
 namespace AresTLib;
 
-internal partial class Compression(NList<byte> originalFile, List<ShortIntervalList> input, int tn)
+internal partial class Compression(NList<byte> originalFile, NList<ShortIntervalList> input, int tn)
 {
-	private readonly List<ShortIntervalList> result = [];
+	private readonly NList<ShortIntervalList> result = [];
 
-	internal List<ShortIntervalList> PreEncode(ref int rle, out NList<byte> originalFile2)
+	internal NList<ShortIntervalList> PreEncode(ref int rle, out NList<byte> originalFile2)
 	{
-		List<ShortIntervalList> cdl;
+		NList<ShortIntervalList> cdl;
 		NList<byte> string1, string2, cstring;
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 11;
@@ -30,7 +30,7 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 			cstring = string2;
 		}
 		originalFile2 = cstring;
-		cdl = new ShortIntervalList[originalFile2.Length + 1];
+		cdl = RedStarLinq.NEmptyList<ShortIntervalList>(originalFile2.Length + 1);
 		cdl[0] = [];
 		var originalFile2_ = originalFile2;
 		Parallel.For(0, originalFile2.Length, i => cdl[i + 1] = ByteIntervals[originalFile2_[i]]);
@@ -38,10 +38,10 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 		return cdl;
 	}
 
-	internal void Encode1(ref byte[] cs, ref int lz)
+	internal void Encode1(ref NList<byte> cs, ref int lz)
 	{
-		byte[] s, cs2 = cs;
-		List<List<ShortIntervalList>> tl1, ctl;
+		NList<byte> s, cs2 = cs;
+		List<NList<ShortIntervalList>> tl1, ctl;
 		LZData[] lzData = [new(), new(), new()];
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 9;
@@ -49,10 +49,10 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 		if (ctl.Length == 0)
 			throw new EncoderFallbackException();
 		Subtotal[tn] += ProgressBarStep;
-		tl1 = RedStarLinq.Fill(ctl.Length, _ => new List<ShortIntervalList>());
+		tl1 = RedStarLinq.Fill(ctl.Length, _ => new NList<ShortIntervalList>());
 		if ((PresentMethodsT & UsedMethodsT.LZ1) != 0)
 		{
-			tl1 = RedStarLinq.Fill(ctl.Length, _ => new List<ShortIntervalList>());
+			tl1 = RedStarLinq.Fill(ctl.Length, _ => new NList<ShortIntervalList>());
 			for (var i = 0; i < WordsListActualParts; i++)
 			{
 				tl1[i] = new(new LempelZiv(ctl[i], result, tn).Encode(out lzData[i]));
@@ -82,19 +82,20 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 			cs = s;
 	}
 
-	internal void Encode2(ref byte[] cs, ref int lz)
+	internal void Encode2(ref NList<byte> cs)
 	{
-		byte[] s;
-		List<List<ShortIntervalList>> ctl;
+		NList<byte> s;
+		List<NList<ShortIntervalList>> ctl;
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 7;
 		ctl = MakeWordsSplit((PresentMethodsT & UsedMethodsT.COMB2) != 0);
 		if (ctl.Length is not (3 or 4))
 			throw new EncoderFallbackException();
 		Subtotal[tn] += ProgressBarStep;
-		ctl[1] = new(new BWTT(ctl[1], result, tn).Encode(true));
+		var bwtEncoder = new BWTT(result, tn);
+		ctl[2] = new(bwtEncoder.Encode(ctl[2]));
 		Subtotal[tn] += ProgressBarStep;
-		ctl[2] = new(new BWTT(ctl[2], result, tn).Encode(true));
+		ctl[1] = new(bwtEncoder.Encode(ctl[1]));
 		Subtotal[tn] += ProgressBarStep;
 		var lzData = new LZData[ctl.Length];
 		Subtotal[tn] += ProgressBarStep;
@@ -104,9 +105,9 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 			cs = s;
 	}
 
-	internal void Encode3(ref byte[] cs, ref int indicator)
+	internal void Encode3(ref NList<byte> cs, ref int indicator)
 	{
-		byte[] s;
+		NList<byte> s;
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * 2;
 		var ctl = MakeWordsSplit(false);
@@ -125,13 +126,13 @@ internal partial class Compression(NList<byte> originalFile, List<ShortIntervalL
 	}
 }
 
-public record class Executions(byte[] OriginalFile)
+public record class ExecutionsT(NList<byte> OriginalFile)
 {
-	private readonly byte[][] s = RedStarLinq.FillArray(ProgressBarGroups, _ => OriginalFile);
-	private byte[] cs = OriginalFile;
-	private int bwt = 0, rle = 0, lz = 0, misc = 0, lzP1 = 0, lzP2 = 0, miscP3 = 0;
+	private readonly NList<byte>[] s = RedStarLinq.FillArray(ProgressBarGroups, _ => OriginalFile);
+	private NList<byte> cs = OriginalFile;
+	private int bwt = 0, rle = 0, lz = 0, misc = 0, lzP1 = 0, miscP3 = 0;
 
-	public byte[] Encode()
+	public NList<byte> Encode()
 	{
 		Total = 0;
 		TotalMaximum = ProgressBarStep * 6;
@@ -149,7 +150,6 @@ public record class Executions(byte[] OriginalFile)
 		else if ((PresentMethodsT & UsedMethodsT.CS2) != 0 && s[1].Length < cs.Length && s[1].Length > 0 && s[1].Length < s[0].Length)
 		{
 			bwt = 2;
-			lz = lzP2;
 			cs = s[1];
 		}
 		else if ((PresentMethodsT & UsedMethodsT.CS1) != 0 && s[0].Length < cs.Length && s[0].Length > 0)
@@ -160,14 +160,14 @@ public record class Executions(byte[] OriginalFile)
 		}
 		else
 			throw new EncoderFallbackException();
-		var compressedFile = new[] { (byte)(misc + lz + bwt + 1) }.Concat(cs).ToArray();
+		var compressedFile = new[] { (byte)(misc + lz + bwt + 1) }.Concat(cs).ToNList();
 #if DEBUG
 		Validate(compressedFile);
 #endif
 		return compressedFile;
 	}
 
-	private void InitThreads(List<ShortIntervalList> mainInput, NList<byte> originalFile2)
+	private void InitThreads(NList<ShortIntervalList> mainInput, NList<byte> originalFile2)
 	{
 		Threads[0] = new Thread(() =>
 		{
@@ -186,7 +186,7 @@ public record class Executions(byte[] OriginalFile)
 			try
 			{
 				if ((PresentMethodsT & UsedMethodsT.CS2) != 0 && rle == 0)
-					new Compression(originalFile2, mainInput, 1).Encode2(ref s[1], ref lzP2);
+					new Compression(originalFile2, mainInput, 1).Encode2(ref s[1]);
 			}
 			catch
 			{
@@ -222,14 +222,17 @@ public record class Executions(byte[] OriginalFile)
 	}
 #if DEBUG
 
-	private void Validate(byte[] compressedFile)
+	private void Validate(NList<byte> compressedFile)
 	{
 		try
 		{
-			var decoded = new DecodingT().Decode(compressedFile, ProgramVersion);
+			using var dec = new DecodingT();
+			using var decoded = dec.Decode(compressedFile, ProgramVersion);
 			for (var i = 0; i < OriginalFile.Length; i++)
 				if (OriginalFile[i] != decoded[i])
 					throw new DecoderFallbackException();
+			if (OriginalFile.Length != decoded.Length)
+				throw new DecoderFallbackException();
 		}
 		catch (Exception ex) when (ex is not DecoderFallbackException)
 		{

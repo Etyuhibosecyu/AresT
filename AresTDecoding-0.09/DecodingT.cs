@@ -42,14 +42,21 @@ public static class Global
 	public static Dictionary<byte, byte[]>[] UnicodeDicRev { get; } = new[] { Encoding.Unicode, Encoding.UTF8 }.ToArray(l => new Chain(0x0400, 0x60).ToDictionary(x => unchecked((byte)(x - 0x0400 + 0x80)), x => l.GetBytes("" + (char)x)));
 }
 
-public class DecodingT
+public class DecodingT : IDisposable
 {
 	protected GlobalDecoding globalDecoding = default!;
 	protected ArithmeticDecoder ar = default!;
 	protected int misc, lz, bwt, n;
 	protected int repeatsCount = 1;
+	protected uint encoding;
 
-	public virtual byte[] Decode(byte[] compressedFile, byte encodingVersion)
+	public virtual void Dispose()
+	{
+		ar?.Dispose();
+		GC.SuppressFinalize(this);
+	}
+
+	public virtual NList<byte> Decode(NList<byte> compressedFile, byte encodingVersion)
 	{
 		if (compressedFile.Length <= 2)
 			return [];
@@ -60,13 +67,13 @@ public class DecodingT
 			{
 				_ => throw new DecoderFallbackException(),
 			};
-		if (ProcessMethod(compressedFile) is byte[] bytes)
+		if (ProcessMethod(compressedFile) is NList<byte> bytes)
 			return bytes;
 		var byteList = ProcessMisc(compressedFile);
 		return [.. byteList.Repeat(repeatsCount)];
 	}
 
-	protected virtual byte[]? ProcessMethod(byte[] compressedFile)
+	protected virtual NList<byte>? ProcessMethod(NList<byte> compressedFile)
 	{
 		int method = compressedFile[0];
 		if (method == 0)
@@ -79,14 +86,14 @@ public class DecodingT
 		return null;
 	}
 
-	protected virtual NList<byte> ProcessMisc(byte[] compressedFile) => misc switch
+	protected virtual NList<byte> ProcessMisc(NList<byte> compressedFile) => misc switch
 	{
 		0 => ProcessMisc0(compressedFile, out _),
 		-1 => ProcessNonMisc(compressedFile),
 		_ => throw new DecoderFallbackException(),
 	};
 
-	protected virtual NList<byte> ProcessMisc0(byte[] compressedFile, out uint encoding)
+	protected virtual NList<byte> ProcessMisc0(NList<byte> compressedFile, out uint encoding)
 	{
 		ar = compressedFile[1..];
 		globalDecoding = CreateGlobalDecoding();
@@ -95,7 +102,7 @@ public class DecodingT
 		return JoinWords(list, nulls);
 	}
 
-	protected virtual NList<byte> ProcessNonMisc(byte[] compressedFile)
+	protected virtual NList<byte> ProcessNonMisc(NList<byte> compressedFile)
 	{
 		Current[0] = 0;
 		CurrentMaximum[0] = ProgressBarStep * (bwt != 0 ? 6 : 5);
@@ -112,65 +119,65 @@ public class DecodingT
 		bwt = method % 4 / 2;
 	}
 
-	public virtual void ProcessLZLength(LZData lzData, SumList lengthsSL, out int readIndex, out uint length)
+	public virtual void ProcessLZLength(LZData lzData, SumList lengthsSL, out int readItem, out uint length)
 	{
-		readIndex = ar.ReadPart(lengthsSL);
-		lengthsSL.Increase(readIndex);
+		readItem = ar.ReadPart(lengthsSL);
+		lengthsSL.Increase(readItem);
 		if (lzData.Length.R == 0)
-			length = (uint)readIndex;
+			length = (uint)readItem;
 		else if (lzData.Length.R == 1)
 		{
-			length = (uint)readIndex;
+			length = (uint)readItem;
 			if (length == lzData.Length.Threshold + 1)
 				length += ar.ReadEqual(lzData.Length.Max - lzData.Length.Threshold);
 		}
 		else
 		{
-			length = (uint)readIndex + lzData.Length.Threshold;
+			length = (uint)readItem + lzData.Length.Threshold;
 			if (length == lzData.Length.Max + 1)
 				length = ar.ReadEqual(lzData.Length.Threshold);
 		}
 	}
 
-	public virtual void ProcessLZDist(LZData lzData, SumList distsSL, int fullLength, out int readIndex, out uint dist, uint length, out uint maxDist)
+	public virtual void ProcessLZDist(LZData lzData, SumList distsSL, int fullLength, out int readItem, out uint dist, uint length, out uint maxDist)
 	{
 		maxDist = Min(lzData.Dist.Max, (uint)(fullLength - length - 2));
-		readIndex = ar.ReadPart(distsSL);
-		distsSL.Increase(readIndex);
+		readItem = ar.ReadPart(distsSL);
+		distsSL.Increase(readItem);
 		if (lzData.Dist.R == 0 || maxDist < lzData.Dist.Threshold)
-			dist = (uint)readIndex;
+			dist = (uint)readItem;
 		else if (lzData.Dist.R == 1)
 		{
-			dist = (uint)readIndex;
+			dist = (uint)readItem;
 			if (dist == lzData.Dist.Threshold + 1)
 				dist += ar.ReadEqual(maxDist - lzData.Dist.Threshold + lzData.UseSpiralLengths);
 		}
 		else
-			dist = (uint)readIndex;
+			dist = (uint)readItem;
 	}
 
-	public virtual bool ProcessLZSpiralLength(LZData lzData, ref uint dist, out uint spiralLength, uint maxDist)
+	public virtual void ProcessLZSpiralLength(LZData lzData, ref uint dist, out uint spiralLength, uint maxDist)
 	{
-		if (dist == maxDist + 1)
+		if (dist != maxDist + 1)
 		{
-			if (lzData.SpiralLength.R == 0)
-				spiralLength = ar.ReadEqual(lzData.SpiralLength.Max + 1);
-			else if (lzData.SpiralLength.R == 1)
-			{
-				spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold + 2);
-				if (spiralLength == lzData.SpiralLength.Threshold + 1)
-					spiralLength += ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold);
-			}
-			else
-			{
-				spiralLength = ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold + 2) + lzData.SpiralLength.Threshold;
-				if (spiralLength == lzData.SpiralLength.Max + 1)
-					spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold);
-			}
-			return true;
+			spiralLength = 0;
+			return;
 		}
-		spiralLength = 0;
-		return false;
+		dist = 0;
+		if (lzData.SpiralLength.R == 0)
+			spiralLength = ar.ReadEqual(lzData.SpiralLength.Max + 1);
+		else if (lzData.SpiralLength.R == 1)
+		{
+			spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold + 2);
+			if (spiralLength == lzData.SpiralLength.Threshold + 1)
+				spiralLength += ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold);
+		}
+		else
+		{
+			spiralLength = ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold + 2) + lzData.SpiralLength.Threshold;
+			if (spiralLength == lzData.SpiralLength.Max + 1)
+				spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold);
+		}
 	}
 
 	protected virtual void PPMWGetEncodingAndNulls(out uint encoding, out uint maxLength, out ListHashSet<int> nulls)
@@ -183,7 +190,7 @@ public class DecodingT
 			nulls.Add((int)ar.ReadCount() + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
 	}
 
-	protected virtual List<List<ShortIntervalList>> ProcessUTF8(List<List<ShortIntervalList>> list, bool utf8)
+	protected virtual List<NList<ShortIntervalList>> ProcessUTF8(List<NList<ShortIntervalList>> list, bool utf8)
 	{
 		if (utf8)
 		{
@@ -199,40 +206,51 @@ public class DecodingT
 		return list;
 	}
 
-	protected virtual NList<byte> JoinWords(List<List<ShortIntervalList>> input, ListHashSet<int> nulls) => input.Wrap(tl =>
+	protected virtual NList<byte> JoinWords(List<NList<ShortIntervalList>> input, ListHashSet<int> nulls)
 	{
-		var encoding = tl[0][^1][0].Lower;
 		var encoding2 = (encoding == 1) ? Encoding.Unicode : (encoding == 2) ? Encoding.UTF8 : Encoding.GetEncoding(1251);
 		var a = 0;
-		var joinedWords = new DecodingT().DecodeUnicode(tl[1].ToNList(x => (byte)x[0].Lower), encoding, encoding2).ToArray();
-		var wordsList = tl[0].GetSlice(..^1).ToList(l => encoding2.GetString(joinedWords[a..(a += (int)l[0].Lower)]));
-		var result = encoding2.GetBytes(RedStarLinq.ToString(tl[2].ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => DecodeCOMB(l[1].Lower == 1 ? [.. x, ' '] : [.. x], true))))).Wrap(bl => encoding == 2 ? bl.ToNList().Insert(0, tl[3][1..CreateVar((int)(tl[3][0][0].Lower + 1), out var rightStart)].ToArray(x => (byte)x[0].Lower)).AddRange(tl[3][(rightStart + 1)..(int)(rightStart + tl[3][rightStart][0].Lower + 1)].ToArray(x => (byte)x[0].Lower)) : bl.ToNList());
+		var joinedWords = new DecodingT().DecodeUnicode(input[1].ToNList(x => (byte)x[0].Lower), encoding, encoding2).ToArray();
+		var wordsList = input[0].ToList(l => encoding2.GetString(joinedWords[a..(a += (int)l[0].Lower)]));
+		if (a != joinedWords.Length)
+			throw new DecoderFallbackException();
+		var result = encoding2.GetBytes(RedStarLinq.ToString(input[2].ConvertAndJoin(l => wordsList[(int)l[0].Lower].Wrap(x => DecodeCOMB(l[1].Lower == 1 ? [.. x, ' '] : [.. x], true))))).Wrap(bl => encoding == 2 ? bl.ToNList().Insert(0, input[3][1..CreateVar((int)(input[3][0][0].Lower + 1), out var rightStart)].ToArray(x => (byte)x[0].Lower)).AddRange(input[3][(rightStart + 1)..(int)(rightStart + input[3][rightStart][0].Lower + 1)].ToArray(x => (byte)x[0].Lower)) : bl.ToNList());
 		foreach (var x in nulls)
 			if (encoding == 0)
 				result.Insert(x, 0);
 			else
 				result.Insert(x, [0, 0]);
 		return result;
-	});
+	}
 
 	public virtual uint GetFragmentLength() => (uint)FragmentLength;
 
-	protected virtual List<List<ShortIntervalList>> FillHFWTripleList(ListHashSet<int> nulls)
+	protected virtual List<NList<ShortIntervalList>> FillHFWTripleList(ListHashSet<int> nulls)
 	{
 		var bwtBlockSize = 0;
-		return ProcessUTF8(CreateVar(RedStarLinq.Fill(3, i => CreateDecoding2(nulls, i, ref bwtBlockSize).Decode()), out var list), list[0][^1][0].Lower == 2);
+		return ProcessUTF8(CreateVar(RedStarLinq.Fill(3, i =>
+		{
+			using var dec = CreateDecoding2(nulls, i, ref bwtBlockSize);
+			return dec.Decode();
+		}), out var list), encoding == 2);
 	}
 
-	protected virtual List<List<ShortIntervalList>> PPMWFillTripleList(uint encoding, uint maxLength)
+	protected virtual List<NList<ShortIntervalList>> PPMWFillTripleList(uint encoding, uint maxLength)
 	{
 		Current[0] = 0;
 		CurrentMaximum[0] = ProgressBarStep * 3;
-		List<List<ShortIntervalList>> list = globalDecoding.CreatePPM(maxLength, 0).Decode();
+		var ppm = globalDecoding.CreatePPM(maxLength, 0);
+		List<NList<ShortIntervalList>> list = ppm.Decode();
+		ppm.Dispose();
 		list[0].Add([new(encoding, 3)]);
 		Current[0] += ProgressBarStep;
-		list.Add(globalDecoding.CreatePPM(ValuesInByte, 1).Decode());
+		ppm = globalDecoding.CreatePPM(ValuesInByte, 1);
+		list.Add(ppm.Decode());
+		ppm.Dispose();
 		Current[0] += ProgressBarStep;
-		list.Add(globalDecoding.CreatePPM((uint)list[0].Length - 1, 2).Decode());
+		ppm = globalDecoding.CreatePPM((uint)list[0].Length - 1, 2);
+		list.Add(ppm.Decode());
+		ppm.Dispose();
 		Current[0] += ProgressBarStep;
 		ProcessUTF8(list, encoding == 2);
 		return list;
@@ -242,9 +260,11 @@ public class DecodingT
 
 	public virtual GlobalDecoding CreateGlobalDecoding() => new(ar);
 
-	protected virtual Decoding2T CreateDecoding2(ListHashSet<int> nulls, int i, ref int bwtBlockSize) => new(this, ar, nulls, bwt, bwt == 0 || i == 2 ? lz : 0, n = i, ref bwtBlockSize);
+	protected virtual Decoding2T CreateDecoding2(ListHashSet<int> nulls, int i, ref int bwtBlockSize) => new(this, globalDecoding, ar, nulls, bwt, bwt == 0 || i == 2 ? lz : 0, n = i, ref bwtBlockSize);
 
-	public virtual List<ShortIntervalList> DecodeBWT(List<ShortIntervalList> input, NList<uint> skipped, int bwtBlockSize)
+	public virtual void SetEncoding(uint encoding) => this.encoding = encoding;
+
+	public virtual NList<ShortIntervalList> DecodeBWT(NList<ShortIntervalList> input, NList<uint> skipped, int bwtBlockSize)
 	{
 		var bwtBlockExtraSize = bwtBlockSize <= 0x4000 ? 2 : bwtBlockSize <= 0x400000 ? 3 : bwtBlockSize <= 0x40000000 ? 4 : 5;
 		Status[0] = 0;
@@ -259,7 +279,7 @@ public class DecodingT
 		}
 		var hs = bytes2.Filter((x, index) => index % (bwtBlockSize + bwtBlockExtraSize) >= bwtBlockExtraSize).ToHashSet().Concat(skipped).Sort().ToHashSet();
 		var @base = hs.Max() + 1;
-		List<ShortIntervalList> result = new(bytes2.Length);
+		NList<ShortIntervalList> result = new(bytes2.Length);
 		for (var i = 0; i < bytes2.Length; i += bwtBlockSize, Status[0]++)
 		{
 			if (bytes2.Length - i <= bwtBlockExtraSize)
@@ -273,7 +293,7 @@ public class DecodingT
 		return result;
 	}
 
-	protected virtual List<ShortIntervalList> DecodeBWT2(NList<uint> input, ListHashSet<uint> hs, uint @base, int firstPermutation)
+	protected virtual NList<ShortIntervalList> DecodeBWT2(NList<uint> input, ListHashSet<uint> hs, uint @base, int firstPermutation)
 	{
 		var mtfMemory = hs.ToArray();
 		for (var i = 0; i < input.Length; i++)
@@ -285,7 +305,7 @@ public class DecodingT
 		}
 		var sorted = input.ToArray((elem, index) => (elem, index)).NSort(x => x.elem);
 		var convert = sorted.ToArray(x => x.index);
-		var result = RedStarLinq.EmptyList<ShortIntervalList>(input.Length);
+		var result = RedStarLinq.NEmptyList<ShortIntervalList>(input.Length);
 		var it = firstPermutation;
 		for (var i = 0; i < input.Length; i++)
 		{
@@ -316,7 +336,7 @@ public class DecodingT
 				zeroCode.Add(byteList[i++] == zero ? '0' : '1');
 				length = (int)(new MpzT(zeroCode.ToString(), 2) - 1);
 			}
-			result.AddRange(RedStarLinq.NFill(zero, length));
+			result.AddSeries(zero, length);
 		}
 		return result;
 	}

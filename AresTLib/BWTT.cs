@@ -3,9 +3,9 @@ using Mpir.NET;
 
 namespace AresTLib;
 
-internal class BWTT(List<ShortIntervalList> Input, List<ShortIntervalList> Result, int TN)
+internal class BWTT(NList<ShortIntervalList> Result, int TN)
 {
-	public List<ShortIntervalList> Encode(bool words = false)
+	public NList<ShortIntervalList> Encode(NList<ShortIntervalList> Input)
 	{
 		if (Input.Length == 0)
 			throw new EncoderFallbackException();
@@ -23,7 +23,7 @@ internal class BWTT(List<ShortIntervalList> Input, List<ShortIntervalList> Resul
 			Result[0] = new(Result[0]) { new((uint)BitsCount((uint)BWTBlockSize) - 14, 18) };
 		Status[TN] = 0;
 		StatusMaximum[TN] = 7;
-		var byteInput = Input.GetSlice(startPos).ToNList(x => wordsApplied ? x[0].Lower * 2 + x[1].Lower : x[0].Lower);
+		var byteInput = Input.GetRange(startPos).ToNList(x => wordsApplied ? x[0].Lower * 2 + x[1].Lower : x[0].Lower);
 		Status[TN]++;
 		var uniqueElems = byteInput.ToHashSet();
 		Status[TN]++;
@@ -54,7 +54,7 @@ internal class BWTT(List<ShortIntervalList> Input, List<ShortIntervalList> Resul
 			{
 				var x = input2[i][j];
 				var y = decoded[i][j];
-				if (!(x.Equals(y) || GetBaseWithBuffer(x.Base, words) == y.Base && x.Lower == y.Lower && x.Length == y.Length))
+				if (x != y)
 					throw new DecoderFallbackException();
 			}
 		if (input2.Length != decoded.Length)
@@ -71,11 +71,12 @@ internal class BWTT(List<ShortIntervalList> Input, List<ShortIntervalList> Resul
 		return Result;
 		void BWTInternal()
 		{
-			var buffer = RedStarLinq.FillArray(Environment.ProcessorCount, index => byteInput.Length < BWTBlockSize * (index + 1) ? default! : GC.AllocateUninitializedArray<uint>(BWTBlockSize * 2 - 1));
-			var currentBlock = RedStarLinq.FillArray(buffer.Length, index => byteInput.Length < BWTBlockSize * (index + 1) ? default! : GC.AllocateUninitializedArray<uint>(BWTBlockSize));
-			var indexes = RedStarLinq.FillArray(buffer.Length, index => byteInput.Length < BWTBlockSize * (index + 1) ? default! : GC.AllocateUninitializedArray<int>(BWTBlockSize));
+			var buffer = RedStarLinq.FillArray(Environment.ProcessorCount, index => byteInput.Length < BWTBlockSize * (index + 1) ? default! : RedStarLinq.NEmptyList<uint>(BWTBlockSize * 2 - 1));
+			var currentBlock = RedStarLinq.FillArray(buffer.Length, index => byteInput.Length < BWTBlockSize * (index + 1) ? default! : RedStarLinq.NEmptyList<uint>(BWTBlockSize));
+			var indexes = RedStarLinq.FillArray(buffer.Length, index => byteInput.Length < BWTBlockSize * (index + 1) ? default! : RedStarLinq.NEmptyList<int>(BWTBlockSize));
 			var tasks = new Task[buffer.Length];
 			var MTFMemory = RedStarLinq.FillArray<uint[]>(buffer.Length, _ => default!);
+			var multiThreadedCompare = buffer[buffer.Length * 3 / 4] == null;
 			for (var i = 0; i < GetArrayLength(byteInput.Length, BWTBlockSize); i++)
 			{
 				tasks[i % buffer.Length]?.Wait();
@@ -87,9 +88,12 @@ internal class BWTT(List<ShortIntervalList> Input, List<ShortIntervalList> Resul
 					currentBlock[i % buffer.Length] = default!;
 					indexes[i % buffer.Length] = default!;
 					GC.Collect();
-					buffer[i % buffer.Length] = GC.AllocateUninitializedArray<uint>((byteInput.Length - i2) * 2 - 1);
-					currentBlock[i % buffer.Length] = GC.AllocateUninitializedArray<uint>(byteInput.Length - i2);
-					indexes[i % buffer.Length] = GC.AllocateUninitializedArray<int>(byteInput.Length - i2);
+					buffer[i % buffer.Length]?.Dispose();
+					currentBlock[i % buffer.Length]?.Dispose();
+					indexes[i % buffer.Length]?.Dispose();
+					buffer[i % buffer.Length] = RedStarLinq.NEmptyList<uint>((byteInput.Length - i2) * 2 - 1);
+					currentBlock[i % buffer.Length] = RedStarLinq.NEmptyList<uint>(byteInput.Length - i2);
+					indexes[i % buffer.Length] = RedStarLinq.NEmptyList<int>(byteInput.Length - i2);
 				}
 				for (var j = 0; j < length; j++)
 					currentBlock[i % buffer.Length][j] = byteInput[i2 + j];
@@ -97,6 +101,9 @@ internal class BWTT(List<ShortIntervalList> Input, List<ShortIntervalList> Resul
 				tasks[i % buffer.Length] = Task.Factory.StartNew(() => BWTMain(i3));
 			}
 			tasks.ForEach(x => x?.Wait());
+			buffer.ForEach(x => x?.Dispose());
+			currentBlock.ForEach(x => x?.Dispose());
+			indexes.ForEach(x => x?.Dispose());
 			void BWTMain(int blockIndex)
 			{
 				var firstPermutation = 0;
@@ -109,27 +116,27 @@ internal class BWTT(List<ShortIntervalList> Input, List<ShortIntervalList> Resul
 				}
 				WriteToMTF(blockIndex);
 			}
-			void GetBWT(uint[] source, uint[] buffer, int[] indexes, uint[] Result, ref int firstPermutation)
+			void GetBWT(NList<uint> source, NList<uint> buffer, NList<int> indexes, NList<uint> result, ref int firstPermutation)
 			{
-				CopyMemory(source, 0, buffer, 0, source.Length);
-				CopyMemory(source, 0, buffer, source.Length, source.Length - 1);
+				buffer.SetRange(0, source);
+				buffer.SetRange(source.Length, source[..^1]);
 				for (var i = 0; i < indexes.Length; i++)
 					indexes[i] = i;
-				var indexesToSort = buffer.BWTCompare(source.Length);
+				var indexesToSort = buffer.BWTCompare(source.Length, multiThreadedCompare ? TN : -1);
 				foreach (var index in indexesToSort)
 				{
-					indexes.NSort(x => buffer[index + x]);
+					indexes.Sort(x => buffer[index + x]);
 					Status[TN] += (int)Floor((double)source.Length / indexesToSort.Length);
 				}
 				indexesToSort.Dispose();
 #if DEBUG
-				if (indexes.ToHashSet().Length != indexes.Length)
+				if (!indexes.AllUnique())
 					throw new InvalidOperationException();
 #endif
-				firstPermutation = Array.IndexOf(indexes, 0);
+				firstPermutation = indexes.IndexOf(0);
 				// Копирование результата
 				for (var i = 0; i < source.Length; i++)
-					Result[i] = buffer[indexes[i] + indexes.Length - 1];
+					result[i] = buffer[indexes[i] + indexes.Length - 1];
 			}
 			void WriteToMTF(int blockIndex)
 			{
