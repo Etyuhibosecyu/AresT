@@ -9,14 +9,14 @@ internal partial class Compression(NList<byte> originalFile, NList<ShortInterval
 	{
 		NList<ShortIntervalList> cdl;
 		NList<byte> string1, string2, cstring;
-		Subtotal[tn] = 0;
-		SubtotalMaximum[tn] = ProgressBarStep * 11;
+		Methods[tn] = 0;
+		MethodsMaximum[tn] = ProgressBarStep * 11;
 		cstring = originalFile;
-		Subtotal[tn] += ProgressBarStep;
+		Methods[tn] += ProgressBarStep;
 		string1 = new RLE(cstring, tn).Encode();
-		Subtotal[tn] += ProgressBarStep;
-		string2 = new RLE(cstring, tn).RLE3();
-		Subtotal[tn] += ProgressBarStep;
+		Methods[tn] += ProgressBarStep;
+		string2 = new RLE3(cstring, tn).Encode();
+		Methods[tn] += ProgressBarStep;
 		Current[tn] = 0;
 		Status[tn] = 0;
 		if (string1.Length < cstring.Length * 0.5 && string1.Length < string2.Length)
@@ -34,7 +34,7 @@ internal partial class Compression(NList<byte> originalFile, NList<ShortInterval
 		cdl[0] = [];
 		var originalFile2_ = originalFile2;
 		Parallel.For(0, originalFile2.Length, i => cdl[i + 1] = ByteIntervals[originalFile2_[i]]);
-		Subtotal[tn] += ProgressBarStep;
+		Methods[tn] += ProgressBarStep;
 		return cdl;
 	}
 
@@ -43,12 +43,12 @@ internal partial class Compression(NList<byte> originalFile, NList<ShortInterval
 		NList<byte> s, cs2 = cs;
 		List<NList<ShortIntervalList>> tl1, ctl;
 		LZData[] lzData = [new(), new(), new()];
-		Subtotal[tn] = 0;
-		SubtotalMaximum[tn] = ProgressBarStep * 9;
+		Methods[tn] = 0;
+		MethodsMaximum[tn] = ProgressBarStep * 9;
 		ctl = MakeWordsSplit((PresentMethodsT & UsedMethodsT.COMB1) != 0);
 		if (ctl.Length == 0)
 			throw new EncoderFallbackException();
-		Subtotal[tn] += ProgressBarStep;
+		Methods[tn] += ProgressBarStep;
 		tl1 = RedStarLinq.Fill(ctl.Length, _ => new NList<ShortIntervalList>());
 		if ((PresentMethodsT & UsedMethodsT.LZ1) != 0)
 		{
@@ -56,7 +56,7 @@ internal partial class Compression(NList<byte> originalFile, NList<ShortInterval
 			for (var i = 0; i < WordsListActualParts; i++)
 			{
 				tl1[i] = new(new LempelZiv(ctl[i], result, tn).Encode(out lzData[i]));
-				Subtotal[tn] += ProgressBarStep;
+				Methods[tn] += ProgressBarStep;
 			}
 			for (var i = WordsListActualParts; i < ctl.Length; i++)
 				for (var j = 0; j < ctl[i].Length; j++)
@@ -66,10 +66,10 @@ internal partial class Compression(NList<byte> originalFile, NList<ShortInterval
 		else
 		{
 			tl1 = ctl;
-			Subtotal[tn] += ProgressBarStep * 3;
+			Methods[tn] += ProgressBarStep * 3;
 			s = cs2;
 		}
-		Subtotal[tn] += ProgressBarStep;
+		Methods[tn] += ProgressBarStep;
 		if (s.Length < cs2.Length && s.Length > 0)
 		{
 			lz = 1;
@@ -77,7 +77,7 @@ internal partial class Compression(NList<byte> originalFile, NList<ShortInterval
 			cs2 = s;
 		}
 		s = new AdaptiveHuffman(tn).Encode(ctl, lzData);
-		Subtotal[tn] += ProgressBarStep;
+		Methods[tn] += ProgressBarStep;
 		if (s.Length < cs2.Length && s.Length > 0)
 			cs = s;
 	}
@@ -86,21 +86,21 @@ internal partial class Compression(NList<byte> originalFile, NList<ShortInterval
 	{
 		NList<byte> s;
 		List<NList<ShortIntervalList>> ctl;
-		Subtotal[tn] = 0;
-		SubtotalMaximum[tn] = ProgressBarStep * 7;
+		Methods[tn] = 0;
+		MethodsMaximum[tn] = ProgressBarStep * 7;
 		ctl = MakeWordsSplit((PresentMethodsT & UsedMethodsT.COMB2) != 0);
 		if (ctl.Length is not (3 or 4))
 			throw new EncoderFallbackException();
-		Subtotal[tn] += ProgressBarStep;
+		Methods[tn] += ProgressBarStep;
 		var bwtEncoder = new BWTT(result, tn);
 		ctl[2] = new(bwtEncoder.Encode(ctl[2]));
-		Subtotal[tn] += ProgressBarStep;
+		Methods[tn] += ProgressBarStep;
 		ctl[1] = new(bwtEncoder.Encode(ctl[1]));
-		Subtotal[tn] += ProgressBarStep;
+		Methods[tn] += ProgressBarStep;
 		var lzData = new LZData[ctl.Length];
-		Subtotal[tn] += ProgressBarStep;
+		Methods[tn] += ProgressBarStep;
 		s = new AdaptiveHuffman(tn).Encode(ctl, lzData);
-		Subtotal[tn] += ProgressBarStep;
+		Methods[tn] += ProgressBarStep;
 		if (s.Length < cs.Length && s.Length > 0)
 			cs = s;
 	}
@@ -108,16 +108,16 @@ internal partial class Compression(NList<byte> originalFile, NList<ShortInterval
 	internal void Encode3(ref NList<byte> cs, ref int indicator)
 	{
 		NList<byte> s;
-		Subtotal[tn] = 0;
-		SubtotalMaximum[tn] = ProgressBarStep * 2;
+		Methods[tn] = 0;
+		MethodsMaximum[tn] = ProgressBarStep * 2;
 		var ctl = MakeWordsSplit(false);
 		if (ctl.Length == 0)
 			throw new EncoderFallbackException();
-		Subtotal[tn] += ProgressBarStep;
-		var ppm = new PPM(tn);
-		s = ppm.Encode(ctl);
+		Methods[tn] += ProgressBarStep;
+		var ppm = new PPM(ctl, tn);
+		s = ppm.Encode();
 		ppm.Dispose();
-		Subtotal[tn] += ProgressBarStep;
+		Methods[tn] += ProgressBarStep;
 		if (s.Length < originalFile.Length && s.Length > 0)
 		{
 			indicator = 4;
@@ -134,12 +134,12 @@ public record class ExecutionsT(NList<byte> OriginalFile)
 
 	public NList<byte> Encode()
 	{
-		Total = 0;
-		TotalMaximum = ProgressBarStep * 6;
+		Branches = 0;
+		BranchesMaximum = ProgressBarStep * 6;
 		var mainInput = new Compression(OriginalFile.ToNList(), [], 0).PreEncode(ref rle, out var originalFile2);
 		if (rle != 0)
 			throw new EncoderFallbackException();
-		Total += ProgressBarStep;
+		Branches += ProgressBarStep;
 		InitThreads(mainInput, originalFile2);
 		ProcessThreads();
 		if ((PresentMethodsT & UsedMethodsT.CS3) != 0 && s[2].Length < cs.Length && s[2].Length > 0 && s[2].Length < s[1].Length && s[2].Length < s[0].Length)
@@ -179,7 +179,7 @@ public record class ExecutionsT(NList<byte> OriginalFile)
 			catch
 			{
 			}
-			Total += ProgressBarStep;
+			Branches += ProgressBarStep;
 		});
 		Threads[1] = new Thread(() =>
 		{
@@ -191,7 +191,7 @@ public record class ExecutionsT(NList<byte> OriginalFile)
 			catch
 			{
 			}
-			Total += ProgressBarStep;
+			Branches += ProgressBarStep;
 		});
 		Threads[2] = new Thread(() =>
 		{
@@ -203,7 +203,7 @@ public record class ExecutionsT(NList<byte> OriginalFile)
 			catch
 			{
 			}
-			Total += ProgressBarStep;
+			Branches += ProgressBarStep;
 		});
 		for (var i = 0; i < ProgressBarGroups; i++)
 			if (Threads[i] != null && Threads[i].ThreadState is not System.Threading.ThreadState.Unstarted or System.Threading.ThreadState.Running)
