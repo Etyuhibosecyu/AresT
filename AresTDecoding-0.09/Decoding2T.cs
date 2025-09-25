@@ -1,5 +1,4 @@
-﻿
-namespace AresTLib;
+﻿namespace AresTLib;
 
 public class Decoding2T : IDisposable
 {
@@ -24,7 +23,7 @@ public class Decoding2T : IDisposable
 		this.bwt = bwt;
 		this.lz = lz;
 		this.n = n;
-		counter = (int)ar.ReadCount() - (n == 0 ? 2 : 1);
+		counter = (int)ar.ReadNumber() - (n == 0 ? 2 : 1);
 		if (bwt != 0 && n == 1)
 		{
 			bwtBlockSize = (int)ar.ReadEqual(18);
@@ -59,7 +58,7 @@ public class Decoding2T : IDisposable
 		{
 			var counter2 = 7;
 			lzRDist = ar.ReadEqual(3);
-			lzMaxDist = ar.ReadCount();
+			lzMaxDist = ar.ReadNumber();
 			if (lzRDist != 0)
 			{
 				lzThresholdDist = ar.ReadEqual(lzMaxDist + 1);
@@ -67,7 +66,7 @@ public class Decoding2T : IDisposable
 			}
 			lzDist = new(lzRDist, lzMaxDist, lzThresholdDist);
 			lzRLength = ar.ReadEqual(3);
-			lzMaxLength = ar.ReadCount(16);
+			lzMaxLength = ar.ReadNumber(16);
 			if (lzRLength != 0)
 			{
 				lzThresholdLength = ar.ReadEqual(lzMaxLength + 1);
@@ -83,7 +82,7 @@ public class Decoding2T : IDisposable
 			if (lzUseSpiralLengths == 1)
 			{
 				lzRSpiralLength = ar.ReadEqual(3);
-				lzMaxSpiralLength = ar.ReadCount(16);
+				lzMaxSpiralLength = ar.ReadNumber(16);
 				counter2 += 3;
 				if (lzRSpiralLength != 0)
 				{
@@ -101,7 +100,7 @@ public class Decoding2T : IDisposable
 
 	protected virtual void ProcessNulls()
 	{
-		(encoding, maxLength, var nullsCount) = n == 0 ? (ar.ReadEqual(3), ar.ReadCount(), decoding.GetNullsCount()) : (0, 0, 0);
+		(encoding, maxLength, var nullsCount) = n == 0 ? (ar.ReadEqual(3), ar.ReadNumber(), decoding.GetNullsCount()) : (0, 0, 0);
 		if (n == 0 && nulls != null)
 		{
 			var counter2 = 1;
@@ -109,7 +108,7 @@ public class Decoding2T : IDisposable
 				throw new DecoderFallbackException();
 			for (var i = 0; i < nullsCount; i++)
 			{
-				var value = ar.ReadCount();
+				var value = ar.ReadNumber();
 				if (value > decoding.GetFragmentLength())
 					throw new DecoderFallbackException();
 				nulls.Add((int)value + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
@@ -139,6 +138,4 @@ public class Decoding2T : IDisposable
 		using var dec = new AdaptiveHuffmanDec(globalDecoding, ar, skipped, lzData, bwt == 0 || n == 2 ? lz : 0, bwt, n, bwtBlockSize, counter);
 		return dec.Decode();
 	}
-
-	protected virtual uint GetHuffmanBase(uint oldBase) => GetBaseWithBuffer(oldBase, true);
 }

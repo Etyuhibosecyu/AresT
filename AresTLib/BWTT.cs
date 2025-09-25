@@ -1,5 +1,7 @@
-﻿
-using Mpir.NET;
+﻿using Mpir.NET;
+using NStar.ExtraHS;
+using NStar.Linq;
+using UnsafeFunctions;
 
 namespace AresTLib;
 
@@ -25,7 +27,7 @@ internal class BWTT(NList<ShortIntervalList> Result, int TN)
 		StatusMaximum[TN] = 7;
 		var byteInput = Input.GetRange(startPos).ToNList(x => wordsApplied ? x[0].Lower * 2 + x[1].Lower : x[0].Lower);
 		Status[TN]++;
-		var uniqueElems = byteInput.ToHashSet();
+		var uniqueElems = byteInput.ToNHashSet();
 		Status[TN]++;
 		var uniqueElems2 = uniqueElems.ToNList().Sort();
 		Status[TN]++;
@@ -42,7 +44,7 @@ internal class BWTT(NList<ShortIntervalList> Result, int TN)
 		byteInput.Clear();
 		for (var i = 0; i < byteResult.Length; i += BWTBlockSize)
 			byteInput.AddRange(byteResult.GetRange(i..(i += BWTBlockExtraSize))).AddRange(ZLE(byteResult.Skip(i).Take(BWTBlockSize), byteInput.GetRange(^BWTBlockExtraSize..), uniqueElems2[0]));
-		uniqueElems2 = byteResult.Filter((x, index) => index % (BWTBlockSize + BWTBlockExtraSize) >= BWTBlockExtraSize).ToHashSet().ToNList().Sort();
+		uniqueElems2 = byteResult.Filter((x, index) => index % (BWTBlockSize + BWTBlockExtraSize) >= BWTBlockExtraSize).ToNHashSet().ToNList().Sort();
 		Result.AddRange(byteInput.Convert((x, index) => new ShortIntervalList() { new(x, index >= BWTBlockExtraSize && wordsApplied ? Input[startPos][0].Base * 2 : ValuesInByte) }));
 		Result[0].Add(BWTApplied);
 		uniqueElems.ExceptWith(uniqueElems2);
@@ -61,7 +63,7 @@ internal class BWTT(NList<ShortIntervalList> Result, int TN)
 			throw new DecoderFallbackException();
 #endif
 		var c = uniqueElems.PConvert(x => new Interval(x, wordsApplied ? Input[startPos][0].Base * 2 : ValuesInByte));
-		c.Insert(0, GetCountList((uint)uniqueElems.Length));
+		c.Insert(0, GetNumberAsIntervalList((uint)uniqueElems.Length));
 		var cSplit = c.SplitIntoEqual(8);
 		c.Dispose();
 		var cLength = (uint)cSplit.Length;
@@ -119,10 +121,10 @@ internal class BWTT(NList<ShortIntervalList> Result, int TN)
 			void GetBWT(NList<uint> source, NList<uint> buffer, NList<int> indexes, NList<uint> result, ref int firstPermutation)
 			{
 				buffer.SetRange(0, source);
-				buffer.SetRange(source.Length, source[..^1]);
+				source.CopyRangeTo(0, buffer, source.Length, source.Length - 1);
 				for (var i = 0; i < indexes.Length; i++)
 					indexes[i] = i;
-				var indexesToSort = buffer.BWTCompare(source.Length, multiThreadedCompare ? TN : -1);
+				var indexesToSort = buffer.BWTGroup(multiThreadedCompare ? TN : -1);
 				foreach (var index in indexesToSort)
 				{
 					indexes.Sort(x => buffer[index + x]);
@@ -179,7 +181,8 @@ internal class BWTT(NList<ShortIntervalList> Result, int TN)
 			}
 			if (i == j)
 				throw new EncoderFallbackException();
-			Result.AddRange(((MpzT)(i - j + 1)).ToString(2)?.Skip(1).ToArray(x => x == '1' ? zeroB : x == '0' ? zero : throw new EncoderFallbackException()));
+			Result.AddRange(Convert.ToString(i - j + 1, 2)?.Skip(1).ToArray(x => x == '1' ? zeroB : x == '0'
+			? zero : throw new EncoderFallbackException()) ?? throw new EncoderFallbackException());
 		}
 		if (Result.Length < input.Length * 0.936)
 		{

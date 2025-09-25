@@ -1,5 +1,4 @@
-﻿
-namespace AresTLib;
+﻿namespace AresTLib;
 
 internal partial class Compression(NList<byte> originalFile, NList<ShortIntervalList> input, int tn)
 {
@@ -38,10 +37,10 @@ internal partial class Compression(NList<byte> originalFile, NList<ShortInterval
 		return cdl;
 	}
 
-	internal void Encode1(ref NList<byte> cs, ref int lz)
+	internal void LZEncode(ref NList<byte> cs, ref int lz)
 	{
 		NList<byte> s, cs2 = cs;
-		List<NList<ShortIntervalList>> tl1, ctl;
+		NList<ShortIntervalList>[] tl1, ctl;
 		LZData[] lzData = [new(), new(), new()];
 		Methods[tn] = 0;
 		MethodsMaximum[tn] = ProgressBarStep * 9;
@@ -49,13 +48,13 @@ internal partial class Compression(NList<byte> originalFile, NList<ShortInterval
 		if (ctl.Length == 0)
 			throw new EncoderFallbackException();
 		Methods[tn] += ProgressBarStep;
-		tl1 = RedStarLinq.Fill(ctl.Length, _ => new NList<ShortIntervalList>());
+		tl1 = RedStarLinq.FillArray(ctl.Length, _ => new NList<ShortIntervalList>());
 		if ((PresentMethodsT & UsedMethodsT.LZ1) != 0)
 		{
-			tl1 = RedStarLinq.Fill(ctl.Length, _ => new NList<ShortIntervalList>());
+			tl1 = RedStarLinq.FillArray(ctl.Length, _ => new NList<ShortIntervalList>());
 			for (var i = 0; i < WordsListActualParts; i++)
 			{
-				tl1[i] = new(new LempelZiv(ctl[i], result, tn).Encode(out lzData[i]));
+				tl1[i] = new(new LempelZiv(ctl[i], result, tn).Encode());
 				Methods[tn] += ProgressBarStep;
 			}
 			for (var i = WordsListActualParts; i < ctl.Length; i++)
@@ -82,10 +81,10 @@ internal partial class Compression(NList<byte> originalFile, NList<ShortInterval
 			cs = s;
 	}
 
-	internal void Encode2(ref NList<byte> cs)
+	internal void BWTEncode(ref NList<byte> cs)
 	{
 		NList<byte> s;
-		List<NList<ShortIntervalList>> ctl;
+		NList<ShortIntervalList>[] ctl;
 		Methods[tn] = 0;
 		MethodsMaximum[tn] = ProgressBarStep * 7;
 		ctl = MakeWordsSplit((PresentMethodsT & UsedMethodsT.COMB2) != 0);
@@ -105,7 +104,7 @@ internal partial class Compression(NList<byte> originalFile, NList<ShortInterval
 			cs = s;
 	}
 
-	internal void Encode3(ref NList<byte> cs, ref int indicator)
+	internal void PPMEncode(ref NList<byte> cs, ref int indicator)
 	{
 		NList<byte> s;
 		Methods[tn] = 0;
@@ -126,7 +125,7 @@ internal partial class Compression(NList<byte> originalFile, NList<ShortInterval
 	}
 }
 
-public record class ExecutionsT(NList<byte> OriginalFile)
+public record class FragmentEncT(NList<byte> OriginalFile)
 {
 	private readonly NList<byte>[] s = RedStarLinq.FillArray(ProgressBarGroups, _ => OriginalFile);
 	private NList<byte> cs = OriginalFile;
@@ -174,7 +173,7 @@ public record class ExecutionsT(NList<byte> OriginalFile)
 			try
 			{
 				if ((PresentMethodsT & UsedMethodsT.CS1) != 0 && rle == 0)
-					new Compression(originalFile2, mainInput, 0).Encode1(ref s[0], ref lzP1);
+					new Compression(originalFile2, mainInput, 0).LZEncode(ref s[0], ref lzP1);
 			}
 			catch
 			{
@@ -186,7 +185,7 @@ public record class ExecutionsT(NList<byte> OriginalFile)
 			try
 			{
 				if ((PresentMethodsT & UsedMethodsT.CS2) != 0 && rle == 0)
-					new Compression(originalFile2, mainInput, 1).Encode2(ref s[1]);
+					new Compression(originalFile2, mainInput, 1).BWTEncode(ref s[1]);
 			}
 			catch
 			{
@@ -198,7 +197,7 @@ public record class ExecutionsT(NList<byte> OriginalFile)
 			try
 			{
 				if ((PresentMethodsT & UsedMethodsT.CS3) != 0)
-					new Compression(originalFile2, mainInput, 2).Encode3(ref s[2], ref miscP3);
+					new Compression(originalFile2, mainInput, 2).PPMEncode(ref s[2], ref miscP3);
 			}
 			catch
 			{

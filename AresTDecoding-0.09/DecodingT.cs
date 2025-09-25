@@ -1,19 +1,20 @@
 ﻿global using AresGlobalMethods;
-global using Corlib.NStar;
+global using NStar.Core;
+global using NStar.Dictionaries;
+global using NStar.ExtraHS;
+global using NStar.Linq;
+global using NStar.MathLib;
+global using NStar.SumCollections;
 global using System;
-global using System.Runtime.InteropServices;
 global using System.Text;
-global using System.Threading;
-global using System.Threading.Tasks;
 global using UnsafeFunctions;
 global using G = System.Collections.Generic;
 global using static AresGlobalMethods.DecodingExtents;
 global using static AresTLib.Global;
-global using static Corlib.NStar.Extents;
+global using static NStar.Core.Extents;
 global using static System.Math;
 global using static UnsafeFunctions.Global;
-global using String = Corlib.NStar.String;
-using System.Text.RegularExpressions;
+global using String = NStar.Core.String;
 using Mpir.NET;
 
 namespace AresTLib;
@@ -50,12 +51,6 @@ public class DecodingT : IDisposable
 	protected int repeatsCount = 1;
 	protected uint encoding;
 
-	public virtual void Dispose()
-	{
-		ar?.Dispose();
-		GC.SuppressFinalize(this);
-	}
-
 	public virtual NList<byte> Decode(NList<byte> compressedFile, byte encodingVersion)
 	{
 		if (compressedFile.Length <= 2)
@@ -71,6 +66,12 @@ public class DecodingT : IDisposable
 			return bytes;
 		var byteList = ProcessMisc(compressedFile);
 		return [.. byteList.Repeat(repeatsCount)];
+	}
+
+	public virtual void Dispose()
+	{
+		ar?.Dispose();
+		GC.SuppressFinalize(this);
 	}
 
 	protected virtual NList<byte>? ProcessMethod(NList<byte> compressedFile)
@@ -119,86 +120,25 @@ public class DecodingT : IDisposable
 		bwt = method % 4 / 2;
 	}
 
-	public virtual void ProcessLZLength(LZData lzData, SumList lengthsSL, out int readItem, out uint length)
-	{
-		readItem = ar.ReadPart(lengthsSL);
-		lengthsSL.Increase(readItem);
-		if (lzData.Length.R == 0)
-			length = (uint)readItem;
-		else if (lzData.Length.R == 1)
-		{
-			length = (uint)readItem;
-			if (length == lzData.Length.Threshold + 1)
-				length += ar.ReadEqual(lzData.Length.Max - lzData.Length.Threshold);
-		}
-		else
-		{
-			length = (uint)readItem + lzData.Length.Threshold;
-			if (length == lzData.Length.Max + 1)
-				length = ar.ReadEqual(lzData.Length.Threshold);
-		}
-	}
-
-	public virtual void ProcessLZDist(LZData lzData, SumList distsSL, int fullLength, out int readItem, out uint dist, uint length, out uint maxDist)
-	{
-		maxDist = Min(lzData.Dist.Max, (uint)(fullLength - length - 2));
-		readItem = ar.ReadPart(distsSL);
-		distsSL.Increase(readItem);
-		if (lzData.Dist.R == 0 || maxDist < lzData.Dist.Threshold)
-			dist = (uint)readItem;
-		else if (lzData.Dist.R == 1)
-		{
-			dist = (uint)readItem;
-			if (dist == lzData.Dist.Threshold + 1)
-				dist += ar.ReadEqual(maxDist - lzData.Dist.Threshold + lzData.UseSpiralLengths);
-		}
-		else
-			dist = (uint)readItem;
-	}
-
-	public virtual void ProcessLZSpiralLength(LZData lzData, ref uint dist, out uint spiralLength, uint maxDist)
-	{
-		if (dist != maxDist + 1)
-		{
-			spiralLength = 0;
-			return;
-		}
-		dist = 0;
-		if (lzData.SpiralLength.R == 0)
-			spiralLength = ar.ReadEqual(lzData.SpiralLength.Max + 1);
-		else if (lzData.SpiralLength.R == 1)
-		{
-			spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold + 2);
-			if (spiralLength == lzData.SpiralLength.Threshold + 1)
-				spiralLength += ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold);
-		}
-		else
-		{
-			spiralLength = ar.ReadEqual(lzData.SpiralLength.Max - lzData.SpiralLength.Threshold + 2) + lzData.SpiralLength.Threshold;
-			if (spiralLength == lzData.SpiralLength.Max + 1)
-				spiralLength = ar.ReadEqual(lzData.SpiralLength.Threshold);
-		}
-	}
-
 	protected virtual void PPMWGetEncodingAndNulls(out uint encoding, out uint maxLength, out ListHashSet<int> nulls)
 	{
-		(encoding, maxLength, var nullCount) = (ar.ReadEqual(3), ar.ReadCount(), ar.ReadCount());
+		(encoding, maxLength, var nullCount) = (ar.ReadEqual(3), ar.ReadNumber(), ar.ReadNumber());
 		if (maxLength < 2 || maxLength > GetFragmentLength() || nullCount > GetFragmentLength())
 			throw new DecoderFallbackException();
 		nulls = [];
 		for (var i = 0; i < nullCount; i++)
-			nulls.Add((int)ar.ReadCount() + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
+			nulls.Add((int)ar.ReadNumber() + (nulls.Length == 0 ? 0 : nulls[^1] + 1));
 	}
 
-	protected virtual List<NList<ShortIntervalList>> ProcessUTF8(List<NList<ShortIntervalList>> list, bool utf8)
+	protected virtual NList<ShortIntervalList>[] ProcessUTF8(NList<ShortIntervalList>[] list, bool utf8)
 	{
 		if (utf8)
 		{
-			var leftOffset = ar.ReadCount();
-			list.Add([[new(leftOffset, 0xffffffff)]]);
+			var leftOffset = ar.ReadNumber();
+			list[3] = [[new(leftOffset, 0xffffffff)]];
 			for (var i = 0; i < leftOffset; i++)
 				list[^1].Add([new(ar.ReadEqual(ValuesInByte), ValuesInByte)]);
-			var rightOffset = ar.ReadCount();
+			var rightOffset = ar.ReadNumber();
 			list[^1].Add([new(rightOffset, 0xffffffff)]);
 			for (var i = 0; i < rightOffset; i++)
 				list[^1].Add([new(ar.ReadEqual(ValuesInByte), ValuesInByte)]);
@@ -206,7 +146,7 @@ public class DecodingT : IDisposable
 		return list;
 	}
 
-	protected virtual NList<byte> JoinWords(List<NList<ShortIntervalList>> input, ListHashSet<int> nulls)
+	protected virtual NList<byte> JoinWords(NList<ShortIntervalList>[] input, ListHashSet<int> nulls)
 	{
 		var encoding2 = (encoding == 1) ? Encoding.Unicode : (encoding == 2) ? Encoding.UTF8 : Encoding.GetEncoding(1251);
 		var a = 0;
@@ -219,44 +159,44 @@ public class DecodingT : IDisposable
 			if (encoding == 0)
 				result.Insert(x, 0);
 			else
-				result.Insert(x, [0, 0]);
+				result.Insert(x, new byte[] { 0, 0 });
 		return result;
 	}
 
 	public virtual uint GetFragmentLength() => (uint)FragmentLength;
 
-	protected virtual List<NList<ShortIntervalList>> FillHFWTripleList(ListHashSet<int> nulls)
+	protected virtual NList<ShortIntervalList>[] FillHFWTripleList(ListHashSet<int> nulls)
 	{
 		var bwtBlockSize = 0;
-		return ProcessUTF8(CreateVar(RedStarLinq.Fill(3, i =>
+		return ProcessUTF8(CreateVar(RedStarLinq.FillArray(encoding == 2 ? 4 : 3, i =>
 		{
 			using var dec = CreateDecoding2(nulls, i, ref bwtBlockSize);
 			return dec.Decode();
 		}), out var list), encoding == 2);
 	}
 
-	protected virtual List<NList<ShortIntervalList>> PPMWFillTripleList(uint encoding, uint maxLength)
+	protected virtual NList<ShortIntervalList>[] PPMWFillTripleList(uint encoding, uint maxLength)
 	{
 		Current[0] = 0;
 		CurrentMaximum[0] = ProgressBarStep * 3;
 		var ppm = globalDecoding.CreatePPM(maxLength, 0);
-		List<NList<ShortIntervalList>> list = ppm.Decode();
+		NList<ShortIntervalList>[] list = [ppm.Decode()];
 		ppm.Dispose();
 		list[0].Add([new(encoding, 3)]);
 		Current[0] += ProgressBarStep;
 		ppm = globalDecoding.CreatePPM(ValuesInByte, 1);
-		list.Add(ppm.Decode());
+		list[1] = ppm.Decode();
 		ppm.Dispose();
 		Current[0] += ProgressBarStep;
 		ppm = globalDecoding.CreatePPM((uint)list[0].Length - 1, 2);
-		list.Add(ppm.Decode());
+		list[2] = ppm.Decode();
 		ppm.Dispose();
 		Current[0] += ProgressBarStep;
 		ProcessUTF8(list, encoding == 2);
 		return list;
 	}
 
-	public virtual uint GetNullsCount() => ar.ReadCount();
+	public virtual uint GetNullsCount() => ar.ReadNumber();
 
 	public virtual GlobalDecoding CreateGlobalDecoding() => new(ar);
 
@@ -277,7 +217,7 @@ public class DecodingT : IDisposable
 			bytes2.AddRange(bytes.GetSlice(i..(i += bwtBlockExtraSize)));
 			bytes2.AddRange(zle != 0 ? DecodeZLE(bytes, ref i, bwtBlockSize) : bytes.GetRange(i..Min(i += bwtBlockSize, bytes.Length)));
 		}
-		var hs = bytes2.Filter((x, index) => index % (bwtBlockSize + bwtBlockExtraSize) >= bwtBlockExtraSize).ToHashSet().Concat(skipped).Sort().ToHashSet();
+		var hs = bytes2.Filter((x, index) => index % (bwtBlockSize + bwtBlockExtraSize) >= bwtBlockExtraSize).ToNHashSet().Concat(skipped).Sort().ToNHashSet();
 		var @base = hs.Max() + 1;
 		NList<ShortIntervalList> result = new(bytes2.Length);
 		for (var i = 0; i < bytes2.Length; i += bwtBlockSize, Status[0]++)
@@ -293,7 +233,7 @@ public class DecodingT : IDisposable
 		return result;
 	}
 
-	protected virtual NList<ShortIntervalList> DecodeBWT2(NList<uint> input, ListHashSet<uint> hs, uint @base, int firstPermutation)
+	protected virtual NList<ShortIntervalList> DecodeBWT2(NList<uint> input, NListHashSet<uint> hs, uint @base, int firstPermutation)
 	{
 		var mtfMemory = hs.ToArray();
 		for (var i = 0; i < input.Length; i++)
@@ -329,7 +269,7 @@ public class DecodingT : IDisposable
 				result.Add(byteList[i++]);
 			if (i >= byteList.Length || result.Length >= bwtBlockSize)
 				break;
-			zeroCode.Remove(1);
+			zeroCode.RemoveEnd(1);
 			length = 0;
 			while (i < byteList.Length && result.Length + length < bwtBlockSize && (byteList[i] == zero || byteList[i] == zeroB))
 			{
@@ -381,11 +321,11 @@ public class DecodingT : IDisposable
 			for (var i = 0; i < input.Length; i++)
 			{
 				if (input[i] is >= 1 and < ValuesInByte >> 1)
-					result.AddRange([input[i], 0]);
+					result.AddRange(new byte[] { input[i], 0 });
 				else if (UnicodeDicRev[0].TryGetValue(input[i], out var value))
 					result.AddRange(value);
 				else if (input[i] == 0 && i < input.Length - 2)
-					result.AddRange([input[++i], input[++i]]);
+					result.AddRange(new byte[] { input[++i], input[++i] });
 				else
 					throw new DecoderFallbackException();
 			}
@@ -408,7 +348,7 @@ public class DecodingT : IDisposable
 					<= 0b11101111 => 1,
 					_ => 2,
 				};
-				result.AddRange([input[i], input[++i]]);
+				result.AddRange(new byte[] { input[i], input[++i] });
 				for (; charLength > 0; charLength--)
 					result.Add(input[++i]);
 			}

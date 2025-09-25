@@ -292,7 +292,7 @@ public static class MainClassT
 					bytes.Resize(leftLength);
 			}
 			rfs.ReadExactly(bytes.AsSpan());
-			var s = new ExecutionsT(bytes).Encode();
+			var s = new FragmentEncT(bytes).Encode();
 			if (fragmentCount != 1)
 				wfs.Write([(byte)(s.Length >> (BitsPerByte << 1)), unchecked((byte)(s.Length >> BitsPerByte)), unchecked((byte)s.Length)]);
 			wfs.Write(s.AsSpan());
@@ -429,7 +429,7 @@ public static class MainClassT
 			}
 
 			var dec = new DecodingT();
-			var s = new ExecutionsT(dec.Decode(bytes, encodingVersion)).Encode();
+			var s = new FragmentEncT(dec.Decode(bytes, encodingVersion)).Encode();
 			dec.Dispose();
 			if (fragmentCount != 1)
 				wfs.Write([(byte)(s.Length >> (BitsPerByte << 1)), unchecked((byte)(s.Length >> BitsPerByte)), unchecked((byte)s.Length)]);

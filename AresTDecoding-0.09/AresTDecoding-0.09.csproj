@@ -1,14 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
+		<TargetFramework>net9.0</TargetFramework>
 		<RootNamespace>AresTLib</RootNamespace>
 		<Nullable>enable</Nullable>
 		<CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\AresGlobal\AresGlobalDecoding-0.075\AresGlobalDecoding-0.075.csproj" />
+		<ProjectReference Include="..\..\.NStar\Sources\NStar.Dictionaries\NStar.Dictionaries.csproj" />
+		<ProjectReference Include="..\..\AresGlobal\AresGlobalDecoding\AresGlobalDecoding.csproj" />
 	</ItemGroup>
-
 </Project>

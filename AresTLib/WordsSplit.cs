@@ -1,9 +1,8 @@
-﻿
-namespace AresTLib;
+﻿namespace AresTLib;
 
 internal partial class Compression
 {
-	private List<NList<ShortIntervalList>> MakeWordsSplit(bool comb)
+	private NList<ShortIntervalList>[] MakeWordsSplit(bool comb)
 	{
 		Current[tn] = 0;
 		CurrentMaximum[tn] = ProgressBarStep * 3;
@@ -54,30 +53,30 @@ internal partial class Compression
 		Status[tn]++;
 		var indexCodes = wordsWithoutSpaces.RepresentIntoNumbers();
 		Status[tn]++;
-		List<NList<ShortIntervalList>> result = [];
+		NList<ShortIntervalList>[] result = new NList<ShortIntervalList>[encoding == 2 ? 4 : 3];
 		NList<Interval> c = [new(encoding, 3)];
-		c.WriteCount(maxLength);
-		result.Add(lengths.PNConvert(x => new ShortIntervalList { new(x, maxLength + 1) }));
+		c.WriteNumber(maxLength);
+		result[0] = lengths.PNConvert(x => new ShortIntervalList { new(x, maxLength + 1) });
 		Status[tn]++;
-		result.Add(joinedWords.PNConvert(x => byteLists[x]));
+		result[1] = joinedWords.PNConvert(x => byteLists[x]);
 		Status[tn]++;
-		result.Add(indexCodes.PNConvert((x, index) => uniqueLists[x][words[index].Space ? 1 : 0]));
+		result[2] = indexCodes.PNConvert((x, index) => uniqueLists[x][words[index].Space ? 1 : 0]);
 		Status[tn]++;
 		if (encoding == 2)
 		{
 			NList<Interval> utf8List = [];
-			utf8List.WriteCount((uint)leftRedundantBytes.Length);
+			utf8List.WriteNumber((uint)leftRedundantBytes.Length);
 			foreach (var x in leftRedundantBytes)
 				utf8List.Add(new(x, ValuesInByte));
-			utf8List.WriteCount((uint)rightRedundantBytes.Length);
+			utf8List.WriteNumber((uint)rightRedundantBytes.Length);
 			foreach (var x in rightRedundantBytes)
 				utf8List.Add(new(x, ValuesInByte));
-			result.Add(utf8List.PNConvert(x => new ShortIntervalList() { x }));
+			result[3] = utf8List.PNConvert(x => new ShortIntervalList() { x });
 		}
 		NList<Interval> nullIntervals = [];
-		nullIntervals.WriteCount((uint)nulls.Length);
+		nullIntervals.WriteNumber((uint)nulls.Length);
 		for (var i = 0; i < nulls.Length; i++)
-			nullIntervals.WriteCount((uint)(nulls[i] - CreateVar(i == 0 ? 0 : nulls[i - 1] + 1, out var prev)));
+			nullIntervals.WriteNumber((uint)(nulls[i] - CreateVar(i == 0 ? 0 : nulls[i - 1] + 1, out var prev)));
 		Status[tn]++;
 		result[0].Insert(0, CreateVar(nullIntervals.SplitIntoEqual(8).Convert(x => new ShortIntervalList(x)), out var splitNullIntervals));
 		result[0].Insert(0, new NList<ShortIntervalList>() { new() { LengthsApplied, new(0, (uint)splitNullIntervals.Length + 1, (uint)splitNullIntervals.Length + 1) }, new(c) });
@@ -308,7 +307,7 @@ internal partial class Compression
 				else if (UnicodeDic[0].TryGetValue((input[i], input[i + 1]), out var value))
 					result.Add(value);
 				else
-					result.AddRange([0, input[i], input[i + 1]]);
+					result.AddRange(new byte[] { 0, input[i], input[i + 1] });
 			}
 			return result;
 		}
@@ -324,7 +323,7 @@ internal partial class Compression
 				if (UnicodeDic[1].TryGetValue(((byte)prev, input[i]), out var value))
 					result.Add(value);
 				else
-					result.AddRange([0, (byte)prev, input[i]]);
+					result.AddRange(new byte[] { 0, (byte)prev, input[i] });
 				prev = -1;
 			}
 			else if (input[i] is >= 0b11000000 and <= 0b11011111)
@@ -332,7 +331,7 @@ internal partial class Compression
 			else if (input[i] is >= 0b10000000 and <= 0b10111111)
 				result.Add(input[i]);
 			else
-				result.AddRange([0, input[i]]);
+				result.AddRange(new byte[] { 0, input[i] });
 		}
 		return result;
 	}
